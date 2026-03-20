@@ -81,9 +81,38 @@
   .sidebar-header h1 { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 4px; }
   .sidebar-header p { font-size: 11px; color: var(--muted); line-height: 1.4; }
 
-  .sidebar-search {
+  .sidebar-sort {
+    display: flex;
+    gap: 4px;
     padding: 8px 12px;
     border-bottom: 1px solid var(--border);
+  }
+
+  .sort-btn {
+    flex: 1;
+    padding: 5px 8px;
+    font-size: 10px;
+    font-family: inherit;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+
+  .sort-btn.active {
+    background: var(--fg);
+    color: var(--bg);
+    border-color: var(--fg);
+  }
+
+  .sort-btn:hover:not(.active) { background: var(--hover); color: var(--fg); }
+
+  .sidebar-search {
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
   }
 
   .sidebar-search input {
@@ -159,28 +188,6 @@
 
   .set-item.active .set-count { color: rgba(255,255,255,0.5); }
 
-  .sidebar-actions {
-    padding: 8px 12px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    gap: 6px;
-  }
-
-  .sidebar-actions button {
-    flex: 1;
-    padding: 5px 0;
-    font-size: 11px;
-    font-weight: 500;
-    font-family: inherit;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: opacity 0.15s;
-  }
-
-  .sidebar-actions button:hover { opacity: 0.8; }
-  .btn-primary { background: var(--fg); color: var(--bg); }
-  .btn-secondary { background: transparent; color: var(--fg); border: 1px solid var(--border) !important; }
 
   .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
@@ -468,13 +475,13 @@
       <h1>Icon Sampler</h1>
       <p>Loading icon sets...</p>
     </div>
-    <div class="sidebar-search">
-      <input type="text" id="searchInput" placeholder="Search sets..." oninput="filterSets(this.value)">
+    <div class="sidebar-sort">
+      <button class="sort-btn active" id="btnSortCategory" onclick="setSortMode('category')">By Category</button>
+      <button class="sort-btn" id="btnSortName" onclick="setSortMode('name')">By Name</button>
     </div>
     <div class="set-list" id="setList"></div>
-    <div class="sidebar-actions">
-      <button class="btn-secondary" onclick="selectNone()">None</button>
-      <button class="btn-primary" onclick="selectAll()">All</button>
+    <div class="sidebar-search">
+      <input type="text" id="searchInput" placeholder="Search sets..." oninput="filterSets(this.value)">
     </div>
     <div class="keyboard-hint">
       <kbd>↑</kbd><kbd>↓</kbd> Sets <kbd>←</kbd><kbd>→</kbd> Single <kbd>F</kbd> Full <kbd>D</kbd> Dark <kbd>Esc</kbd> Exit
@@ -535,6 +542,7 @@ let currentView = 'grid';
 let singleIndex = 0;
 let allVisibleIcons = [];
 let searchFilter = '';
+let sortMode = 'category'; // 'category' or 'name'
 const iconCache = {}; // prefix -> [icon names]
 
 async function loadCollections() {
@@ -582,16 +590,27 @@ async function loadCollections() {
   }
 }
 
+function setSortMode(mode) {
+  sortMode = mode;
+  document.getElementById('btnSortCategory').classList.toggle('active', mode === 'category');
+  document.getElementById('btnSortName').classList.toggle('active', mode === 'name');
+  renderSidebar();
+}
+
 function renderSidebar() {
   const el = document.getElementById('setList');
-  const filtered = searchFilter
+  let filtered = searchFilter
     ? SETS.filter(s => s.name.toLowerCase().includes(searchFilter) || s.author.toLowerCase().includes(searchFilter) || s.tier.toLowerCase().includes(searchFilter))
-    : SETS;
+    : [...SETS];
+
+  if (sortMode === 'name') {
+    filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+  }
 
   let html = '';
   let lastTier = '';
   for (const s of filtered) {
-    if (s.tier !== lastTier) {
+    if (sortMode === 'category' && s.tier !== lastTier) {
       html += `<div class="tier-label">${s.tier}</div>`;
       lastTier = s.tier;
     }
