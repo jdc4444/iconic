@@ -281,8 +281,8 @@
 
   .tb-btn { padding: 4px 10px; }
 
-  .canvas { flex: 1; overflow-y: auto; padding: 20px; }
-  .canvas::-webkit-scrollbar { width: 6px; }
+  .canvas { flex: 1; overflow-x: auto; overflow-y: hidden; padding: 20px; }
+  .canvas::-webkit-scrollbar { height: 6px; }
   .canvas::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
   .set-section { margin-bottom: 32px; }
@@ -303,8 +303,10 @@
   .icon-grid {
     display: flex;
     flex-wrap: wrap;
+    flex-direction: column;
+    align-content: flex-start;
     gap: 1px;
-    overflow: visible;
+    max-height: calc(100vh - var(--topbar-h) - 120px);
     padding-bottom: 4px;
   }
 
@@ -927,14 +929,20 @@ document.addEventListener('mouseup', () => {
   document.body.style.userSelect = '';
 });
 
-// Pinch-to-zoom on canvas (trackpad pinch fires wheel with ctrlKey)
+// Pinch-to-zoom and scroll remapping on canvas
 document.getElementById('canvas').addEventListener('wheel', e => {
-  if (!e.ctrlKey) return;
+  if (e.ctrlKey) {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -1 : 1;
+    const factor = 1 + delta * 0.08;
+    currentScale = Math.round(Math.min(512, Math.max(12, currentScale * factor)));
+    updateScale();
+    return;
+  }
+  // Map vertical scroll to horizontal on canvas
+  const canvas = document.getElementById('canvas');
   e.preventDefault();
-  const delta = e.deltaY > 0 ? -1 : 1;
-  const factor = 1 + delta * 0.08;
-  currentScale = Math.round(Math.min(512, Math.max(12, currentScale * factor)));
-  updateScale();
+  canvas.scrollLeft += e.deltaY + e.deltaX;
 }, { passive: false });
 
 loadCollections();
