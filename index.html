@@ -21,6 +21,19 @@
     --topbar-h: 52px;
   }
 
+  body.dark {
+    --bg: #111;
+    --fg: #e8e8e8;
+    --muted: #888;
+    --border: #2a2a2a;
+    --hover: #1a1a1a;
+    --accent: #e8e8e8;
+  }
+
+  body.dark iconify-icon { color: var(--fg); }
+  body.dark .scale-slider { background: var(--border); }
+  body.dark .scale-slider::-webkit-slider-thumb { background: var(--fg); }
+
   body {
     font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     background: var(--bg);
@@ -250,7 +263,7 @@
     border-color: var(--fg);
   }
 
-  .fullscreen-btn {
+  .tb-btn {
     padding: 5px 10px;
     font-size: 11px;
     font-family: inherit;
@@ -263,7 +276,7 @@
     transition: all 0.1s;
   }
 
-  .fullscreen-btn:hover {
+  .tb-btn:hover {
     background: var(--fg);
     color: var(--bg);
   }
@@ -422,6 +435,65 @@
   body.fullscreen .set-section { margin-bottom: 0; }
   body.fullscreen .set-section-header { display: none; }
 
+  /* Fullscreen floating toolbar */
+  .fs-toolbar {
+    display: none;
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    gap: 12px;
+    align-items: center;
+    z-index: 1000;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    transition: opacity 0.2s;
+  }
+
+  body.fullscreen .fs-toolbar { display: flex; }
+
+  .fs-toolbar .scale-slider { width: 120px; }
+
+  .fs-toolbar select {
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--fg);
+    cursor: pointer;
+    outline: none;
+  }
+
+  .fs-close {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--fg);
+    font-size: 16px;
+    font-family: inherit;
+    line-height: 1;
+    transition: all 0.1s;
+  }
+
+  .fs-close:hover {
+    background: var(--fg);
+    color: var(--bg);
+  }
+
+  .fs-toolbar .scale-presets { margin-left: 0; }
+
   /* Loading */
   .loading-msg {
     color: var(--muted);
@@ -473,34 +545,52 @@
       <button onclick="selectAll()">All</button>
     </div>
     <div class="keyboard-hint">
-      <kbd>F</kbd> Fullscreen &nbsp; <kbd>1</kbd>–<kbd>9</kbd> Toggle set &nbsp; <kbd>←</kbd><kbd>→</kbd> Nav single
+      <kbd>F</kbd> Fullscreen &nbsp; <kbd>D</kbd> Dark mode &nbsp; <kbd>←</kbd><kbd>→</kbd> Nav single &nbsp; <kbd>Esc</kbd> Exit
     </div>
   </div>
 
   <div class="main">
     <div class="topbar">
       <label>Scale</label>
-      <input type="range" class="scale-slider" id="scaleSlider" min="12" max="128" value="24">
+      <input type="range" class="scale-slider" id="scaleSlider" min="12" max="512" value="24">
       <span class="scale-value" id="scaleValue">24px</span>
       <div class="scale-presets">
         <button onclick="setScale(16)">16</button>
         <button onclick="setScale(24)" class="active">24</button>
-        <button onclick="setScale(32)">32</button>
         <button onclick="setScale(48)">48</button>
-        <button onclick="setScale(64)">64</button>
         <button onclick="setScale(96)">96</button>
         <button onclick="setScale(128)">128</button>
+        <button onclick="setScale(256)">256</button>
+        <button onclick="setScale(512)">512</button>
       </div>
       <div class="view-toggle">
         <button class="active" onclick="setView('grid')" id="btnGrid">Grid</button>
         <button onclick="setView('single')" id="btnSingle">Single</button>
       </div>
-      <button class="fullscreen-btn" onclick="toggleFullscreen()">Fullscreen</button>
+      <button class="tb-btn" onclick="toggleFullscreen()">Fullscreen</button>
+      <button class="tb-btn" onclick="toggleDark()" id="btnDark">Dark</button>
     </div>
     <div class="canvas" id="canvas">
       <div class="empty-state">Select one or more icon sets to begin</div>
     </div>
   </div>
+</div>
+
+<!-- Fullscreen floating toolbar -->
+<div class="fs-toolbar" id="fsToolbar">
+  <select id="fsSetSelect" onchange="fsSelectSet(this.value)"></select>
+  <label style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Scale</label>
+  <input type="range" class="scale-slider" id="fsScaleSlider" min="12" max="512" value="24">
+  <span class="scale-value" id="fsScaleValue">24px</span>
+  <div class="scale-presets">
+    <button onclick="setScale(24)">24</button>
+    <button onclick="setScale(48)">48</button>
+    <button onclick="setScale(96)">96</button>
+    <button onclick="setScale(256)">256</button>
+    <button onclick="setScale(512)">512</button>
+  </div>
+  <button class="tb-btn" onclick="toggleDark()" id="btnDarkFs">Dark</button>
+  <button class="fs-close" onclick="toggleFullscreen()" title="Exit fullscreen (Esc)">&#215;</button>
 </div>
 
 <script>
@@ -538,7 +628,7 @@ const SETS = [
   },
   {
     id: 'radix', prefix: 'radix-icons', name: 'Radix',
-    desc: 'Tight 15×15 grid. Typographic density. By WorkOS.',
+    desc: 'Tight 15x15 grid. Typographic density. By WorkOS.',
     count: 332, license: 'MIT',
     sample: ['heart','home','gear','magnifying-glass','envelope-closed','bell','person','star','camera','chat-bubble','lightning-bolt','globe','speaker-loud','reader','rocket','scissors','cloud','eye-open','bookmark','target','cube','component-1','dimension','frame','hand','layers','link-2','lock-closed','moon','sun','mobile','shield','crosshair','timer','mix','opacity','ruler-square','transform','value','zoom-in','arrow-right','arrow-left','calendar','code','counter-clockwise-clock']
   },
@@ -608,7 +698,7 @@ let allVisibleIcons = [];
 function renderSidebar() {
   const el = document.getElementById('setList');
   el.innerHTML = SETS.map((s, i) => `
-    <div class="set-item ${activeSets.has(s.id) ? 'active' : ''}" data-id="${s.id}" onclick="toggleSet('${s.id}')">
+    <div class="set-item ${activeSets.has(s.id) ? 'active' : ''}" data-id="${s.id}" onclick="loadSet('${s.id}')">
       <div class="check">${activeSets.has(s.id) ? '✓' : ''}</div>
       <div class="set-info">
         <div class="set-name">${s.name}</div>
@@ -618,40 +708,55 @@ function renderSidebar() {
   `).join('');
 }
 
-function toggleSet(id) {
-  if (activeSets.has(id)) activeSets.delete(id);
-  else activeSets.add(id);
+// Click sidebar = load that set exclusively
+function loadSet(id) {
+  activeSets.clear();
+  activeSets.add(id);
   renderSidebar();
   renderCanvas();
+  syncFsSelect();
 }
 
 function selectAll() {
   SETS.forEach(s => activeSets.add(s.id));
   renderSidebar();
   renderCanvas();
+  syncFsSelect();
 }
 
 function selectNone() {
   activeSets.clear();
   renderSidebar();
   renderCanvas();
+  syncFsSelect();
 }
 
 // Scale
 const slider = document.getElementById('scaleSlider');
+const fsSlider = document.getElementById('fsScaleSlider');
+
 slider.addEventListener('input', () => {
   currentScale = parseInt(slider.value);
+  updateScale();
+});
+
+fsSlider.addEventListener('input', () => {
+  currentScale = parseInt(fsSlider.value);
   updateScale();
 });
 
 function setScale(v) {
   currentScale = v;
   slider.value = v;
+  fsSlider.value = v;
   updateScale();
 }
 
 function updateScale() {
+  slider.value = currentScale;
+  fsSlider.value = currentScale;
   document.getElementById('scaleValue').textContent = currentScale + 'px';
+  document.getElementById('fsScaleValue').textContent = currentScale + 'px';
   document.querySelectorAll('.scale-presets button').forEach(b => {
     b.classList.toggle('active', parseInt(b.textContent) === currentScale);
   });
@@ -670,6 +775,39 @@ function setView(v) {
 // Fullscreen
 function toggleFullscreen() {
   document.body.classList.toggle('fullscreen');
+}
+
+function toggleDark() {
+  document.body.classList.toggle('dark');
+  const isDark = document.body.classList.contains('dark');
+  document.getElementById('btnDark').textContent = isDark ? 'Light' : 'Dark';
+  document.getElementById('btnDarkFs').textContent = isDark ? 'Light' : 'Dark';
+}
+
+// Fullscreen set selector
+function buildFsSelect() {
+  const sel = document.getElementById('fsSetSelect');
+  sel.innerHTML = '<option value="__all__">All Sets</option>' +
+    SETS.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+}
+
+function syncFsSelect() {
+  const sel = document.getElementById('fsSetSelect');
+  if (activeSets.size === SETS.length) {
+    sel.value = '__all__';
+  } else if (activeSets.size === 1) {
+    sel.value = [...activeSets][0];
+  } else {
+    sel.value = '__all__';
+  }
+}
+
+function fsSelectSet(val) {
+  if (val === '__all__') {
+    selectAll();
+  } else {
+    loadSet(val);
+  }
 }
 
 // Canvas
@@ -713,10 +851,6 @@ function renderCanvas() {
 }
 
 function buildIconList(s) {
-  if (s.suffixes) {
-    // For sets with weight variants, show regular only
-    return s.sample.map(name => `${s.prefix}:${name}`);
-  }
   return s.sample.map(name => `${s.prefix}:${name}`);
 }
 
@@ -742,9 +876,9 @@ function renderSingleView(canvas, active) {
       </div>
       <div class="single-icon-name">${current.icon}</div>
       <div class="single-nav">
-        <button onclick="navSingle(-1)">← Prev</button>
+        <button onclick="navSingle(-1)">&larr; Prev</button>
         <span class="single-icon-name">${singleIndex + 1} / ${allVisibleIcons.length}</span>
-        <button onclick="navSingle(1)">Next →</button>
+        <button onclick="navSingle(1)">Next &rarr;</button>
       </div>
     </div>
   `;
@@ -757,23 +891,29 @@ function navSingle(dir) {
 
 // Keyboard
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (document.body.classList.contains('fullscreen')) {
+      toggleFullscreen();
+    }
+    return;
+  }
   if (e.key === 'f' || e.key === 'F') {
-    if (e.target.tagName === 'INPUT') return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
     toggleFullscreen();
+  }
+  if (e.key === 'd' || e.key === 'D') {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    toggleDark();
   }
   if (e.key === 'ArrowLeft') { singleIndex--; renderCanvas(); }
   if (e.key === 'ArrowRight') { singleIndex++; renderCanvas(); }
-
-  const num = parseInt(e.key);
-  if (num >= 1 && num <= 9 && num <= SETS.length) {
-    if (e.target.tagName === 'INPUT') return;
-    toggleSet(SETS[num - 1].id);
-  }
 });
 
 // Init
+buildFsSelect();
 renderSidebar();
 renderCanvas();
+syncFsSelect();
 </script>
 </body>
 </html>
