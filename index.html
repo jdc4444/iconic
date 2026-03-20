@@ -293,7 +293,20 @@
   .set-section-count { font-size: 10px; color: var(--muted); }
   .set-section-author { font-size: 10px; color: var(--muted); margin-left: auto; }
 
-  .icon-grid { display: flex; flex-wrap: wrap; gap: 1px; }
+  .icon-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-direction: column;
+    max-height: 70vh;
+    align-content: flex-start;
+    padding-bottom: 4px;
+  }
+
+  .icon-grid::-webkit-scrollbar { height: 4px; }
+  .icon-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
   .icon-cell {
     display: flex;
@@ -301,9 +314,16 @@
     justify-content: center;
     aspect-ratio: 1;
     border-radius: 3px;
-    transition: background 0.1s;
+    transition: background 0.1s, opacity 0.3s, transform 0.3s;
     cursor: default;
     position: relative;
+    opacity: 0;
+    transform: scale(0.8);
+  }
+
+  .icon-cell.visible {
+    opacity: 1;
+    transform: scale(1);
   }
 
   .icon-cell:hover { background: var(--hover); }
@@ -797,6 +817,8 @@ async function renderCanvas() {
       ).join('')}</div>
     </div>`;
   }).join('');
+
+  animateIcons();
 }
 
 function renderSingleView(canvas, active) {
@@ -824,6 +846,24 @@ function renderSingleView(canvas, active) {
       <button onclick="navSingle(1)">Next &rarr;</button>
     </div>
   </div>`;
+}
+
+function animateIcons() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const cell = entry.target;
+        const delay = parseInt(cell.dataset.delay) || 0;
+        setTimeout(() => cell.classList.add('visible'), delay);
+        observer.unobserve(cell);
+      }
+    });
+  }, { rootMargin: '100px' });
+
+  document.querySelectorAll('.icon-cell:not(.visible)').forEach((cell, i) => {
+    cell.dataset.delay = Math.min(i % 60, 30) * 12;
+    observer.observe(cell);
+  });
 }
 
 function navSingle(dir) { singleIndex += dir; renderCanvas(); }
@@ -881,6 +921,16 @@ document.addEventListener('mouseup', () => {
   document.body.style.cursor = '';
   document.body.style.userSelect = '';
 });
+
+// Pinch-to-zoom on canvas (trackpad pinch fires wheel with ctrlKey)
+document.getElementById('canvas').addEventListener('wheel', e => {
+  if (!e.ctrlKey) return;
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -1 : 1;
+  const factor = 1 + delta * 0.08;
+  currentScale = Math.round(Math.min(512, Math.max(12, currentScale * factor)));
+  updateScale();
+}, { passive: false });
 
 buildFsSelect();
 renderSidebar();
