@@ -48,11 +48,29 @@
 
   .sidebar {
     width: var(--sidebar-w);
-    min-width: var(--sidebar-w);
-    border-right: 1px solid var(--border);
+    min-width: 180px;
+    max-width: 500px;
+    border-right: none;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .resize-handle {
+    width: 5px;
+    cursor: col-resize;
+    background: transparent;
+    border-right: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: background 0.15s;
+    position: relative;
+  }
+
+  .resize-handle:hover,
+  .resize-handle.dragging {
+    background: var(--fg);
+    opacity: 0.12;
   }
 
   .sidebar-header {
@@ -449,6 +467,8 @@
     </div>
   </div>
 
+  <div class="resize-handle" id="resizeHandle"></div>
+
   <div class="main">
     <div class="topbar">
       <label>Scale</label>
@@ -782,6 +802,33 @@ document.addEventListener('keydown', e => {
   if (e.key === 'd' || e.key === 'D') toggleDark();
   if (e.key === 'ArrowLeft') { singleIndex--; renderCanvas(); }
   if (e.key === 'ArrowRight') { singleIndex++; renderCanvas(); }
+});
+
+// Resize handle
+const resizeHandle = document.getElementById('resizeHandle');
+const sidebar = document.querySelector('.sidebar');
+let isResizing = false;
+
+resizeHandle.addEventListener('mousedown', e => {
+  isResizing = true;
+  resizeHandle.classList.add('dragging');
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', e => {
+  if (!isResizing) return;
+  const w = Math.min(500, Math.max(180, e.clientX));
+  sidebar.style.width = w + 'px';
+});
+
+document.addEventListener('mouseup', () => {
+  if (!isResizing) return;
+  isResizing = false;
+  resizeHandle.classList.remove('dragging');
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
 });
 
 buildFsSelect();
