@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Icon Sampler — 100 Sets</title>
+<title>Icon Sampler</title>
 <script src="https://cdn.jsdelivr.net/npm/iconify-icon@3.0.2/dist/iconify-icon.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
@@ -472,7 +472,7 @@
   <div class="sidebar">
     <div class="sidebar-header">
       <h1>Icon Sampler</h1>
-      <p>100 icon sets via Iconify</p>
+      <p>Loading icon sets...</p>
     </div>
     <div class="sidebar-search">
       <input type="text" id="searchInput" placeholder="Search sets..." oninput="filterSets(this.value)">
@@ -533,117 +533,60 @@
 </div>
 
 <script>
-const SETS = [
-  {id:'material-symbols',prefix:'material-symbols',name:'Material Symbols',tier:'Design System',count:15222,author:'Google',license:'Apache 2.0',sample:['downloading','privacy-tip','filter-drama-outline','assignment-ind','monitoring','desktop-access-disabled-outline-sharp']},
-  {id:'material-symbols-light',prefix:'material-symbols-light',name:'Material Symbols Light',tier:'Design System',count:15295,author:'Google',license:'Apache 2.0',sample:['downloading','privacy-tip','filter-drama-outline','assignment-ind','monitoring','desktop-access-disabled-outline-sharp']},
-  {id:'fluent',prefix:'fluent',name:'Fluent UI',tier:'Design System',count:19152,author:'Microsoft',license:'MIT',sample:['zoom-out-24-filled','drink-coffee-24-regular','photo-filter-24-regular','checkmark-24-filled','oval-24-filled','cloud-24-filled']},
-  {id:'carbon',prefix:'carbon',name:'Carbon',tier:'Design System',count:2468,author:'IBM',license:'Apache 2.0',sample:['user-certification','humidity','edit-off','flag-filled','binding-01','mac-option']},
-  {id:'ant-design',prefix:'ant-design',name:'Ant Design',tier:'Design System',count:830,author:'Ant',license:'MIT',sample:['pushpin-filled','pie-chart-outlined','shopping-twotone','layout-outlined','dash-outlined','cloud-twotone']},
-  {id:'bi',prefix:'bi',name:'Bootstrap Icons',tier:'Design System',count:2078,author:'Bootstrap',license:'MIT',sample:['graph-up','card-image','code-slash','egg-fill','brilliance','toggle-on']},
-  {id:'heroicons',prefix:'heroicons',name:'Heroicons',tier:'Design System',count:1288,author:'Tailwind',license:'MIT',sample:['camera','building-library','receipt-refund','bookmark','cloud','folder']},
-  {id:'octicon',prefix:'octicon',name:'Octicons',tier:'Design System',count:726,author:'GitHub',license:'MIT',sample:['alert-24','bell-slash-24','hourglass-24','skip-fill-16','chevron-up-16','kebab-horizontal-16']},
-  {id:'codicon',prefix:'codicon',name:'Codicons',tier:'Design System',count:540,author:'Microsoft',license:'CC BY 4.0',sample:['account','bell-dot','new-file','split-vertical','debug-pause','color-mode']},
-  {id:'clarity',prefix:'clarity',name:'Clarity',tier:'Design System',count:1103,author:'VMware',license:'MIT',sample:['help-outline-badged','heart-broken-solid','shield-outline-alerted','bookmark-solid','check-line','tablet-solid']},
-  {id:'gravity-ui',prefix:'gravity-ui',name:'Gravity UI',tier:'Design System',count:781,author:'Yandex',license:'MIT',sample:['magnifier','bookmark-fill','display','italic','caret-down','ban']},
-  {id:'pajamas',prefix:'pajamas',name:'GitLab SVGs',tier:'Design System',count:410,author:'GitLab',license:'MIT',sample:['preferences','expire','merge','trend-up','template','symlink']},
-  {id:'garden',prefix:'garden',name:'Garden',tier:'Design System',count:916,author:'Zendesk',license:'Apache 2.0',sample:['asterisk-stroke-12','bookmark-fill-12','moon-fill-12','x-stroke-16','menu-stroke-12','heading-stroke-12']},
-  {id:'ix',prefix:'ix',name:'Siemens iX',tier:'Design System',count:1415,author:'Siemens',license:'MIT',sample:['notification-filled','home-filled','panel-ipc','plant-filled','play-filled','folder-filled']},
-  {id:'ph',prefix:'ph',name:'Phosphor',tier:'General Purpose',count:9072,author:'Phosphor Icons',license:'MIT',sample:['folder-open-duotone','check-square-offset-thin','pencil-line-fill','check-thin','browser-duotone','thermometer-simple-fill']},
-  {id:'solar',prefix:'solar',name:'Solar',tier:'General Purpose',count:7401,author:'480 Design',license:'CC BY 4.0',sample:['magnifer-zoom-out-broken','armchair-2-bold-duotone','traffic-economy-line-duotone','user-rounded-bold-duotone','soundwave-linear','hamburger-menu-broken']},
-  {id:'mdi',prefix:'mdi',name:'Material Design Icons',tier:'General Purpose',count:7447,author:'Pictogrammers',license:'Apache 2.0',sample:['account-check','bell-alert-outline','calendar-edit','skip-previous','home-variant','lock-open-outline']},
-  {id:'tabler',prefix:'tabler',name:'Tabler',tier:'General Purpose',count:6074,author:'Paweł Kuna',license:'MIT',sample:['alien','device-desktop','photo','chevron-right','check','square-root']},
-  {id:'lucide',prefix:'lucide',name:'Lucide',tier:'General Purpose',count:1703,author:'Lucide',license:'ISC',sample:['circle-check','award','house','check','mountain','chevron-up']},
-  {id:'ri',prefix:'ri',name:'Remix Icon',tier:'General Purpose',count:3188,author:'Remix Design',license:'Apache 2.0',sample:['lock-2-line','mark-pen-fill','moon-line','filter-2-fill','text','add-line']},
-  {id:'mingcute',prefix:'mingcute',name:'MingCute',tier:'General Purpose',count:3324,author:'MingCute',license:'Apache 2.0',sample:['edit-3-line','alert-fill','riding-line','layout-9-line','currency-dollar-2-line','trello-board-fill']},
-  {id:'hugeicons',prefix:'hugeicons',name:'Huge Icons',tier:'General Purpose',count:4653,author:'Hugeicons',license:'MIT',sample:['analytics-up','android','search-02','tick-02','not-equal-sign','text-align-left-01']},
-  {id:'ion',prefix:'ion',name:'Ionicons',tier:'General Purpose',count:1357,author:'Ionic',license:'MIT',sample:['code-download-sharp','contrast-outline','checkmark-done','navigate-sharp','arrow-redo-outline','bookmark-sharp']},
-  {id:'iconoir',prefix:'iconoir',name:'Iconoir',tier:'General Purpose',count:1671,author:'Luca Burgio',license:'MIT',sample:['chat-bubble-check','edit','activity','check','droplet','hashtag']},
-  {id:'boxicons',prefix:'boxicons',name:'Boxicons',tier:'General Purpose',count:3768,author:'Boxicons',license:'MIT',sample:['clock-2-filled','desk','battery-filled','crop','crypto-coin-filled','scan']},
-  {id:'tdesign',prefix:'tdesign',name:'TDesign',tier:'General Purpose',count:2349,author:'TDesign',license:'MIT',sample:['activity','doge','dam','view-list','rotation','laptop']},
-  {id:'famicons',prefix:'famicons',name:'Famicons',tier:'General Purpose',count:1342,author:'Family',license:'MIT',sample:['backspace-outline','home-sharp','bluetooth-outline','glasses-sharp','resize','funnel-sharp']},
-  {id:'glyphs',prefix:'glyphs',name:'Glyphs',tier:'General Purpose',count:3452,author:'Goran Spasojevic',license:'MIT',sample:['mouse-2-bold','object-select','comment-1-duo','asterisk-outline','search-1-duo','bandage']},
-  {id:'lets-icons',prefix:'lets-icons',name:'Lets Icons',tier:'General Purpose',count:1528,author:'Leonid Tsvetkov',license:'CC BY 4.0',sample:['search-duotone-line','view-alt','message-duotone','remote-light','blank-alt-duotone','code']},
-  {id:'la',prefix:'la',name:'Line Awesome',tier:'General Purpose',count:1544,author:'Icons8',license:'Apache 2.0',sample:['archive-solid','female-solid','check-circle','bars','signal','columns']},
-  {id:'radix-icons',prefix:'radix-icons',name:'Radix',tier:'Minimal',count:332,author:'WorkOS',license:'MIT',sample:['width','checkbox','code','border-width','all-sides','half-2']},
-  {id:'teenyicons',prefix:'teenyicons',name:'Teenyicons',tier:'Minimal',count:1200,author:'smhmd',license:'MIT',sample:['face-id-solid','user-outline','page-break-outline','hexagon-outline','send-left-outline','frame-solid']},
-  {id:'akar-icons',prefix:'akar-icons',name:'Akar Icons',tier:'Minimal',count:454,author:'Arturo Wibawa',license:'MIT',sample:['paper','pencil','location','sort','vue-fill','check']},
-  {id:'charm',prefix:'charm',name:'Charm',tier:'Minimal',count:261,author:'Jay Newey',license:'MIT',sample:['chart-line','image','thumb-up','diamond','diff','tick']},
-  {id:'bytesize',prefix:'bytesize',name:'Bytesize',tier:'Minimal',count:101,author:'Dan Klammer',license:'MIT',sample:['desktop','code','sign-out','checkmark','bookmark','activity']},
-  {id:'mi',prefix:'mi',name:'Mono Icons',tier:'Minimal',count:180,author:'Mono',license:'MIT',sample:['bar-chart','cloud-upload','log-out','board','search','layout']},
-  {id:'gg',prefix:'gg',name:'css.gg',tier:'Minimal',count:704,author:'Astrit',license:'MIT',sample:['align-left','server','overflow','edit-flip-v','terrain','space-between']},
-  {id:'fe',prefix:'fe',name:'Feather',tier:'Minimal',count:255,author:'Megumi Hano',license:'MIT',sample:['add-cart','comments','link-external','check','bolt','map']},
-  {id:'system-uicons',prefix:'system-uicons',name:'System UIcons',tier:'Minimal',count:430,author:'Corey Ginnivan',license:'Unlicense',sample:['bell','message-writing','write','check','pull-left','frame']},
-  {id:'ei',prefix:'ei',name:'Evil Icons',tier:'Minimal',count:70,author:'Madyankin & Shamin',license:'MIT',sample:['paperclip','like','arrow-right','navicon','chevron-right','chart']},
-  {id:'quill',prefix:'quill',name:'Quill',tier:'Minimal',count:140,author:'Casper Lourens',license:'MIT',sample:['collapse','desktop','moon','download','checkmark','activity']},
-  {id:'humbleicons',prefix:'humbleicons',name:'Humbleicons',tier:'Minimal',count:286,author:'Jiří Zralý',license:'MIT',sample:['aid','droplet','rss','volume','times','check']},
-  {id:'circum',prefix:'circum',name:'Circum',tier:'Minimal',count:288,author:'Klarr Agency',license:'MPL 2.0',sample:['text','pill','zoom-out','voicemail','no-waiting-sign','crop']},
-  {id:'nimbus',prefix:'nimbus',name:'Nimbus',tier:'Minimal',count:140,author:'Linkedstore',license:'MIT',sample:['barcode','mail','calendar','mobile','download','volume']},
-  {id:'formkit',prefix:'formkit',name:'FormKit',tier:'Minimal',count:144,author:'FormKit',license:'MIT',sample:['checkbox','reorder','submit','check','radio','close']},
-  {id:'pepicons-pop',prefix:'pepicons-pop',name:'Pepicons Pop',tier:'Artistic',count:1275,author:'CyCraft',license:'CC BY 4.0',sample:['bookmark','moon','pen','hash','heart','times']},
-  {id:'pepicons-print',prefix:'pepicons-print',name:'Pepicons Print',tier:'Artistic',count:1275,author:'CyCraft',license:'CC BY 4.0',sample:['bookmark','moon','pen','hash','heart','times']},
-  {id:'pepicons-pencil',prefix:'pepicons-pencil',name:'Pepicons Pencil',tier:'Artistic',count:1275,author:'CyCraft',license:'CC BY 4.0',sample:['bookmark','moon','pen','hash','heart','times']},
-  {id:'line-md',prefix:'line-md',name:'Line MD (Animated)',tier:'Artistic',count:1218,author:'Vjacheslav Trushkin',license:'MIT',sample:['loading-twotone-loop','beer-alt-twotone-loop','image-twotone','account','cloud-alt-upload-twotone-loop','cog-loop']},
-  {id:'pixelarticons',prefix:'pixelarticons',name:'Pixelarticons',tier:'Artistic',count:800,author:'Gerrit Halfmann',license:'MIT',sample:['home','arrows-horizontal','heart','hash','tab','folder']},
-  {id:'mdi-light',prefix:'mdi-light',name:'MDI Light',tier:'Artistic',count:284,author:'Pictogrammers',license:'OFL',sample:['cart','bell','login','skip-previous','home','lock-open']},
-  {id:'basil',prefix:'basil',name:'Basil',tier:'Artistic',count:493,author:'Craftwork',license:'CC BY 4.0',sample:['comment-solid','search-outline','lightning-alt-solid','check-outline','asana-solid','moon-solid']},
-  {id:'dinkie-icons',prefix:'dinkie-icons',name:'Dinkie',tier:'Artistic',count:1198,author:'atelierAnchor',license:'MIT',sample:['lock-small-filled','u1faab-small','battery-small','monospaced','mobile-phone','menu-small']},
-  {id:'qlementine-icons',prefix:'qlementine-icons',name:'Qlementine',tier:'Artistic',count:863,author:'Olivier Cléro',license:'MIT',sample:['windows-16','check-tick-small-16','speaker-0-16','play-16','triangle-filled-16','folder-filled-16']},
-  {id:'memory',prefix:'memory',name:'Memory',tier:'Artistic',count:651,author:'Pictogrammers',license:'Apache 2.0',sample:['chart-bar','application','message','card-text','monitor','poll']},
-  {id:'flat-color-icons',prefix:'flat-color-icons',name:'Flat Color',tier:'Artistic',count:329,author:'Icons8',license:'MIT',sample:['edit-image','donate','planner','expand','music','checkmark']},
-  {id:'duo-icons',prefix:'duo-icons',name:'Duoicons',tier:'Artistic',count:91,author:'fernandcf',license:'MIT',sample:['credit-card','check-circle','box','folder-open','clapperboard','message-2']},
-  {id:'streamline',prefix:'streamline',name:'Streamline',tier:'Streamline',count:3000,author:'Streamline',license:'CC BY 4.0',sample:['sign-hashtag','open-umbrella-solid','graph-bar-increase','camping-tent','add-circle-solid','filter-2']},
-  {id:'streamline-freehand',prefix:'streamline-freehand',name:'Freehand',tier:'Streamline',count:1000,author:'Streamline',license:'CC BY 4.0',sample:['terminal','cursor-speed-1','lock-cancel-slash','data-transfer-vertical','discount-percent-thin','layouts-right']},
-  {id:'streamline-pixel',prefix:'streamline-pixel',name:'Pixel',tier:'Streamline',count:662,author:'Streamline',license:'CC BY 4.0',sample:['shopping-shipping-bag-1','interface-essential-battery','social-rewards-flag','interface-essential-synchronize-arrows-square-2','shopping-shipping-box','weather-temperature-thermometer']},
-  {id:'streamline-sharp',prefix:'streamline-sharp',name:'Sharp',tier:'Streamline',count:1500,author:'Streamline',license:'CC BY 4.0',sample:['home-1','paperclip-2','new-folder','check','webcam-video-solid','wave-signal']},
-  {id:'streamline-plump',prefix:'streamline-plump',name:'Plump',tier:'Streamline',count:1499,author:'Streamline',license:'CC BY 4.0',sample:['smiley-indiferent','music-note-2','web','circle-clock','loading-horizontal-2','steps-1-solid']},
-  {id:'streamline-cyber',prefix:'streamline-cyber',name:'Cyber',tier:'Streamline',count:500,author:'Streamline',license:'CC BY 4.0',sample:['music-note-1','navigation-up-arrow','map-direction','glass-1','phone-5','fork-knife']},
-  {id:'streamline-block',prefix:'streamline-block',name:'Block',tier:'Streamline',count:300,author:'Streamline',license:'CC BY 4.0',sample:['other-ui-chat','content-write','content-bookmark','nature-lightning','control-buttons-play','basic-ui-remove']},
-  {id:'guidance',prefix:'guidance',name:'Guidance',tier:'Streamline',count:360,author:'Streamline',license:'CC BY 4.0',sample:['smoking-area','playground','glass','paper','escalator','printer']},
-  {id:'icon-park-outline',prefix:'icon-park-outline',name:'IconPark Outline',tier:'IconPark',count:2658,author:'ByteDance',license:'Apache 2.0',sample:['add-one','english-mustache','basketball-clothes','sort','lightning','pinwheel']},
-  {id:'icon-park-solid',prefix:'icon-park-solid',name:'IconPark Solid',tier:'IconPark',count:1947,author:'ByteDance',license:'Apache 2.0',sample:['add-one','english-mustache','basketball-clothes','sort','lightning','pinwheel']},
-  {id:'icon-park-twotone',prefix:'icon-park-twotone',name:'IconPark TwoTone',tier:'IconPark',count:1944,author:'ByteDance',license:'Apache 2.0',sample:['add-one','english-mustache','basketball-clothes','sort','lightning','pinwheel']},
-  {id:'iconamoon',prefix:'iconamoon',name:'IconaMoon',tier:'Well-Crafted',count:1781,author:'Dariush Habibpour',license:'CC BY 4.0',sample:['shield-off-thin','lightning-1-duotone','player-previous-fill','folder-remove-duotone','frame-bold','menu-kebab-vertical-circle-light']},
-  {id:'mynaui',prefix:'mynaui',name:'Myna UI',tier:'Well-Crafted',count:2580,author:'Praveen Juge',license:'MIT',sample:['signal','power','tree','cart','filter','cog-three']},
-  {id:'majesticons',prefix:'majesticons',name:'Majesticons',tier:'Well-Crafted',count:760,author:'Gerrit Halfmann',license:'MIT',sample:['chats-line','home','edit-pen-4-line','pulse','send-line','lightning-bolt']},
-  {id:'flowbite',prefix:'flowbite',name:'Flowbite',tier:'Well-Crafted',count:751,author:'Themesberg',license:'MIT',sample:['user-outline','vue-solid','list-outline','bars-from-left-outline','letter-underline-outline','table-column-solid']},
-  {id:'si',prefix:'si',name:'Sargam Icons',tier:'Well-Crafted',count:1299,author:'Abhimanyu Rana',license:'MIT',sample:['eject-duotone','zoom-in-line','play-duotone','add-fill','segment-duotone','check-line']},
-  {id:'jam',prefix:'jam',name:'Jam Icons',tier:'Well-Crafted',count:940,author:'Michael Amprimo',license:'MIT',sample:['chevrons-square-up-right','luggage-f','rubber','capsule-f','header','tablet']},
-  {id:'mage',prefix:'mage',name:'Mage Icons',tier:'Well-Crafted',count:1042,author:'MageIcons',license:'Apache 2.0',sample:['chart-25','music-fill','coin-a-fill','multiply','dash-menu','cancel-fill']},
-  {id:'stash',prefix:'stash',name:'Stash',tier:'Well-Crafted',count:982,author:'Pingback',license:'MIT',sample:['cloud-solid','clock-duotone','search-duotone','check-solid','heart-solid','burger-classic']},
-  {id:'meteor-icons',prefix:'meteor-icons',name:'Meteor',tier:'Well-Crafted',count:321,author:'zkreations',license:'MIT',sample:['droplet','bolt','flipboard','filter','chevron-down','xmark']},
-  {id:'ci',prefix:'ci',name:'Coolicons',tier:'Well-Crafted',count:442,author:'Kryston Schwarze',license:'CC BY 4.0',sample:['bulb','house-01','compass','chevron-up','shield-warning','shrink']},
-  {id:'proicons',prefix:'proicons',name:'ProIcons',tier:'Well-Crafted',count:539,author:'ProCode',license:'MIT',sample:['code','checkmark','photo-filter','soundwave','more','folder']},
-  {id:'cil',prefix:'cil',name:'CoreUI',tier:'Well-Crafted',count:554,author:'creativeLabs',license:'CC BY 4.0',sample:['airplane-mode-off','badge','color-border','bookmark','stream','file']},
-  {id:'lsicon',prefix:'lsicon',name:'Lsicon',tier:'Well-Crafted',count:716,author:'Wis Design',license:'MIT',sample:['pointer-outline','column-filled','vip-outline','area-chart-outline','density-l-filled','open-new-outline']},
-  {id:'f7',prefix:'f7',name:'Framework7',tier:'Well-Crafted',count:1253,author:'Vladimir Kharlampidi',license:'MIT',sample:['hourglass-bottomhalf-fill','pencil-outline','rosette','placemark-fill','barcode','logo-rss']},
-  {id:'picon',prefix:'picon',name:'Pico-icon',tier:'Well-Crafted',count:824,author:'Picon',license:'OFL',sample:['bookmark','rewind','folder','thunderbolt','message','east']},
-  {id:'eva',prefix:'eva',name:'Eva Icons',tier:'Well-Crafted',count:490,author:'Akveo',license:'MIT',sample:['droplet-off-outline','flash-fill','printer-outline','layout-fill','radio-button-off-outline','person-fill']},
-  {id:'eos-icons',prefix:'eos-icons',name:'EOS Icons',tier:'Well-Crafted',count:253,author:'SUSE',license:'MIT',sample:['modified-date-outlined','arrow-rotate','package','enhancement','quota','commit']},
-  {id:'uil',prefix:'uil',name:'Unicons',tier:'Well-Crafted',count:1215,author:'Iconscout',license:'Apache 2.0',sample:['arrow-circle-right','chat-bubble-user','edit-alt','grids','ellipsis-v','bars']},
-  {id:'lucide-lab',prefix:'lucide-lab',name:'Lucide Lab',tier:'Well-Crafted',count:373,author:'Lucide',license:'ISC',sample:['venn','card-credit','pac-man','cent','candlestick-big-lit','gearbox']},
-  {id:'nrk',prefix:'nrk',name:'NRK Core',tier:'Well-Crafted',count:236,author:'NRK',license:'CC BY 4.0',sample:['lyn','edit','mening','media-airplay','category-active','heart-active']},
-  {id:'rivet-icons',prefix:'rivet-icons',name:'Rivet',tier:'Well-Crafted',count:210,author:'Indiana University',license:'BSD 3-Clause',sample:['lightning','credit-card-solid','pause','bookmark-solid','plus','flag-solid']},
-  {id:'healthicons',prefix:'healthicons',name:'Health Icons',tier:'Thematic',count:2024,author:'Resolve to Save Lives',license:'MIT',sample:['cold-chain','emergency-post','asthma-outline','exercise','health-alt','heart']},
-  {id:'game-icons',prefix:'game-icons',name:'Game Icons',tier:'Thematic',count:4123,author:'GameIcons',license:'CC BY 3.0',sample:['diamond-trophy','thrown-spear','rank-3','stairs','table','soda-can']},
-  {id:'meteocons',prefix:'meteocons',name:'Meteocons',tier:'Thematic',count:447,author:'Bas Milius',license:'MIT',sample:['hurricane-fill','sunrise-fill','windsock','moon-first-quarter','code-red','raindrop-fill']},
-  {id:'wi',prefix:'wi',name:'Weather Icons',tier:'Thematic',count:219,author:'Erik Flowers',license:'OFL',sample:['day-hail','barometer','day-windy','moon-waning-crescent-2','direction-down-right','lightning']},
-  {id:'maki',prefix:'maki',name:'Maki (Mapbox)',tier:'Thematic',count:215,author:'Mapbox',license:'CC0',sample:['entrance-alt1','clothing-store','grocery','roadblock','monument','shelter']},
-  {id:'temaki',prefix:'temaki',name:'Temaki',tier:'Thematic',count:544,author:'Bryan Housel',license:'CC0',sample:['milestone','elevator','storage','obelisk','parking-space','power']},
-  {id:'gis',prefix:'gis',name:'Font-GIS',tier:'Thematic',count:367,author:'Jean-Marc Viglino',license:'CC BY 4.0',sample:['layer-o','poi-o','bbox','flag-start','location-arrow-o','polygon']},
-  {id:'fa6-solid',prefix:'fa6-solid',name:'FA 6 Solid',tier:'Font Awesome',count:1402,author:'Dave Gandy',license:'CC BY 4.0',sample:['location-pin','gem','folder','mound','toggle-on','table-columns']},
-  {id:'fa6-regular',prefix:'fa6-regular',name:'FA 6 Regular',tier:'Font Awesome',count:163,author:'Dave Gandy',license:'CC BY 4.0',sample:['message','clock','folder','face-surprise','bookmark','calendar']},
-  {id:'fa7-solid',prefix:'fa7-solid',name:'FA 7 Solid',tier:'Font Awesome',count:1999,author:'Dave Gandy',license:'CC BY 4.0',sample:['location-pin','gem','folder','mound','toggle-on','table-columns']},
-  {id:'fa7-regular',prefix:'fa7-regular',name:'FA 7 Regular',tier:'Font Awesome',count:272,author:'Dave Gandy',license:'CC BY 4.0',sample:['message','clock','folder','face-surprise','bookmark','calendar']},
-];
-
-const TIER_ORDER = ['Design System','General Purpose','Minimal','Artistic','Streamline','IconPark','Well-Crafted','Thematic','Font Awesome'];
-let activeSets = new Set(['ph']);
+let SETS = [];
+let TIER_ORDER = [];
+let activeSets = new Set();
 let currentScale = 24;
 let currentView = 'grid';
 let singleIndex = 0;
 let allVisibleIcons = [];
 let searchFilter = '';
 const iconCache = {}; // prefix -> [icon names]
+
+async function loadCollections() {
+  const canvas = document.getElementById('canvas');
+  canvas.innerHTML = '<div class="empty-state">Loading collections...</div>';
+  try {
+    const res = await fetch('https://api.iconify.design/collections');
+    const data = await res.json();
+    // Build SETS from API data
+    const sets = [];
+    const categories = new Set();
+    for (const [prefix, info] of Object.entries(data)) {
+      const tier = info.category || 'Uncategorized';
+      categories.add(tier);
+      sets.push({
+        id: prefix,
+        prefix: prefix,
+        name: info.name || prefix,
+        tier: tier,
+        count: info.total || 0,
+        author: info.author?.name || '',
+        license: info.license?.spdx || info.license?.title || '',
+        sample: info.samples || [],
+      });
+    }
+    // Sort by category then name
+    TIER_ORDER = [...categories].sort();
+    sets.sort((a, b) => {
+      const ti = TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier);
+      if (ti !== 0) return ti;
+      return a.name.localeCompare(b.name);
+    });
+    SETS = sets;
+    // Update header
+    document.querySelector('.sidebar-header p').textContent = `${SETS.length} icon sets via Iconify`;
+    document.querySelector('title').textContent = `Icon Sampler — ${SETS.length} Sets`;
+    // Default to first set
+    if (SETS.length) activeSets.add(SETS[0].id);
+    buildFsSelect();
+    renderSidebar();
+    await renderCanvas();
+    syncFsSelect();
+  } catch (e) {
+    canvas.innerHTML = '<div class="empty-state">Failed to load collections. Check network.</div>';
+  }
+}
 
 function renderSidebar() {
   const el = document.getElementById('setList');
@@ -964,10 +907,7 @@ document.getElementById('canvas').addEventListener('wheel', e => {
   updateScale();
 }, { passive: false });
 
-buildFsSelect();
-renderSidebar();
-renderCanvas();
-syncFsSelect();
+loadCollections();
 </script>
 </body>
 </html>
