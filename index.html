@@ -308,7 +308,7 @@
     aspect-ratio: 1;
     border-radius: 3px;
     transition: background 0.1s, opacity 0.18s, transform 0.18s;
-    cursor: default;
+    cursor: pointer;
     position: relative;
     opacity: 0;
     transform: scale(0.8);
@@ -320,7 +320,8 @@
   }
 
   .icon-cell:hover { background: var(--hover); }
-  .icon-cell iconify-icon { display: block; }
+  .icon-cell iconify-icon { display: block; pointer-events: none; }
+  .icon-cell .tooltip { pointer-events: none; }
 
   .icon-cell .tooltip {
     display: none;
@@ -735,23 +736,32 @@ async function renderCanvas() {
   if (currentView === 'single') return renderSingleView(canvas, active);
 
   const cellSize = Math.max(currentScale + 8, 28);
+  // Build allVisibleIcons for click-to-single
+  allVisibleIcons = [];
+  active.forEach(s => {
+    const names = getIcons(s);
+    names.forEach(n => allVisibleIcons.push({ icon: `${s.prefix}:${n}`, set: s.name }));
+  });
 
+  let globalIdx = 0;
   canvas.innerHTML = active.map(s => {
     const names = getIcons(s);
     const icons = names.map(n => `${s.prefix}:${n}`);
-    return `<div class="set-section">
+    const html = `<div class="set-section">
       <div class="set-section-header">
         <span class="set-section-title">${s.name}</span>
         <span class="set-section-count">${icons.length.toLocaleString()} icons · ${s.license}</span>
         <span class="set-section-author">${s.author}</span>
       </div>
-      <div class="icon-grid">${icons.map(icon =>
-        `<div class="icon-cell" style="width:${cellSize}px">
+      <div class="icon-grid">${icons.map(icon => {
+        const idx = globalIdx++;
+        return `<div class="icon-cell" style="width:${cellSize}px" onclick="openSingle(${idx})">
           <iconify-icon icon="${icon}" width="${currentScale}" height="${currentScale}"></iconify-icon>
           <div class="tooltip">${icon}</div>
-        </div>`
-      ).join('')}</div>
+        </div>`;
+      }).join('')}</div>
     </div>`;
+    return html;
   }).join('');
 
   animateIcons();
@@ -803,6 +813,14 @@ function animateIcons() {
 }
 
 function navSingle(dir) { singleIndex += dir; renderCanvas(); }
+
+function openSingle(idx) {
+  singleIndex = idx;
+  currentView = 'single';
+  document.getElementById('btnGrid').classList.remove('active');
+  document.getElementById('btnSingle').classList.add('active');
+  renderCanvas();
+}
 
 // Strip variant suffixes to get a base icon name for cross-set matching
 function iconBaseName(name) {
