@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Icon Sampler</title>
+<script src="https://cdn.jsdelivr.net/npm/iconify-icon@3.0.2/dist/iconify-icon.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #fff;
+    --fg: #000;
+    --muted: #666;
+    --border: #e0e0e0;
+    --hover: #f5f5f5;
+    --accent: #000;
+    --sidebar-w: 260px;
+    --topbar-h: 52px;
+  }
+
+  body {
+    font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    height: 100vh;
+    overflow: hidden;
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Layout */
+  .app { display: flex; height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    width: var(--sidebar-w);
+    min-width: var(--sidebar-w);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-header h1 {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
+  }
+
+  .sidebar-header p {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  .set-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+
+  .set-list::-webkit-scrollbar { width: 4px; }
+  .set-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .set-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: background 0.1s;
+    user-select: none;
+  }
+
+  .set-item:hover { background: var(--hover); }
+  .set-item.active { background: var(--fg); color: var(--bg); }
+
+  .set-item .check {
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid var(--border);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 10px;
+    transition: all 0.1s;
+  }
+
+  .set-item.active .check {
+    border-color: var(--bg);
+    background: var(--bg);
+    color: var(--fg);
+  }
+
+  .set-info { flex: 1; min-width: 0; }
+
+  .set-name {
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .set-meta {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+
+  .set-item.active .set-meta { color: rgba(255,255,255,0.6); }
+
+  .sidebar-actions {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+  }
+
+  .sidebar-actions button {
+    flex: 1;
+    padding: 6px 0;
+    font-size: 11px;
+    font-weight: 500;
+    font-family: inherit;
+    background: var(--fg);
+    color: var(--bg);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .sidebar-actions button:hover { opacity: 0.8; }
+  .sidebar-actions button.secondary {
+    background: transparent;
+    color: var(--fg);
+    border: 1px solid var(--border);
+  }
+
+  /* Main */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Topbar */
+  .topbar {
+    height: var(--topbar-h);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .topbar label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .scale-slider {
+    width: 160px;
+    -webkit-appearance: none;
+    height: 2px;
+    background: var(--border);
+    outline: none;
+    border-radius: 1px;
+  }
+
+  .scale-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    background: var(--fg);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  .scale-value {
+    font-size: 12px;
+    font-weight: 500;
+    min-width: 40px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .scale-presets {
+    display: flex;
+    gap: 4px;
+    margin-left: 4px;
+  }
+
+  .scale-presets button {
+    padding: 3px 8px;
+    font-size: 10px;
+    font-family: inherit;
+    font-weight: 500;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    color: var(--fg);
+    transition: all 0.1s;
+  }
+
+  .scale-presets button:hover,
+  .scale-presets button.active {
+    background: var(--fg);
+    color: var(--bg);
+    border-color: var(--fg);
+  }
+
+  .view-toggle {
+    margin-left: auto;
+    display: flex;
+    gap: 4px;
+  }
+
+  .view-toggle button {
+    padding: 5px 10px;
+    font-size: 11px;
+    font-family: inherit;
+    font-weight: 500;
+    background: transparent;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    color: var(--fg);
+    transition: all 0.1s;
+  }
+
+  .view-toggle button:first-child { border-radius: 4px 0 0 4px; }
+  .view-toggle button:last-child { border-radius: 0 4px 4px 0; }
+  .view-toggle button + button { border-left: none; }
+
+  .view-toggle button.active {
+    background: var(--fg);
+    color: var(--bg);
+    border-color: var(--fg);
+  }
+
+  .fullscreen-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+    font-family: inherit;
+    font-weight: 500;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--fg);
+    transition: all 0.1s;
+  }
+
+  .fullscreen-btn:hover {
+    background: var(--fg);
+    color: var(--bg);
+  }
+
+  /* Canvas */
+  .canvas {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+  }
+
+  .canvas::-webkit-scrollbar { width: 6px; }
+  .canvas::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* Set section in canvas */
+  .set-section {
+    margin-bottom: 40px;
+  }
+
+  .set-section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .set-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .set-section-count {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .set-section-desc {
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+
+  /* Icon grid */
+  .icon-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+  }
+
+  .icon-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    border-radius: 4px;
+    transition: background 0.1s;
+    cursor: default;
+    position: relative;
+  }
+
+  .icon-cell:hover {
+    background: var(--hover);
+  }
+
+  .icon-cell iconify-icon {
+    display: block;
+  }
+
+  /* Tooltip */
+  .icon-cell .tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--fg);
+    color: var(--bg);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .icon-cell:hover .tooltip { display: block; }
+
+  /* Single view */
+  .single-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100%;
+    gap: 32px;
+    text-align: center;
+  }
+
+  .single-icon-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .single-icon-display iconify-icon {
+    display: block;
+  }
+
+  .single-nav {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .single-nav button {
+    padding: 8px 20px;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 500;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--fg);
+    transition: all 0.1s;
+  }
+
+  .single-nav button:hover {
+    background: var(--fg);
+    color: var(--bg);
+  }
+
+  .single-icon-name {
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .single-set-name {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+
+  /* Fullscreen mode */
+  body.fullscreen .sidebar { display: none; }
+  body.fullscreen .topbar { display: none; }
+  body.fullscreen .canvas { padding: 0; }
+  body.fullscreen .icon-grid { gap: 0; }
+  body.fullscreen .icon-cell { border-radius: 0; }
+  body.fullscreen .set-section { margin-bottom: 0; }
+  body.fullscreen .set-section-header { display: none; }
+
+  /* Loading */
+  .loading-msg {
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+    padding: 60px 20px;
+  }
+
+  /* Empty */
+  .empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  /* Keyboard hint */
+  .keyboard-hint {
+    padding: 8px 16px;
+    font-size: 10px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    line-height: 1.6;
+  }
+
+  kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    font-family: inherit;
+    font-size: 10px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--hover);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h1>Icon Sampler</h1>
+      <p>High-design icon sets for sampling and comparison</p>
+    </div>
+    <div class="set-list" id="setList"></div>
+    <div class="sidebar-actions">
+      <button class="secondary" onclick="selectNone()">None</button>
+      <button onclick="selectAll()">All</button>
+    </div>
+    <div class="keyboard-hint">
+      <kbd>F</kbd> Fullscreen &nbsp; <kbd>1</kbd>–<kbd>9</kbd> Toggle set &nbsp; <kbd>←</kbd><kbd>→</kbd> Nav single
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <label>Scale</label>
+      <input type="range" class="scale-slider" id="scaleSlider" min="12" max="128" value="24">
+      <span class="scale-value" id="scaleValue">24px</span>
+      <div class="scale-presets">
+        <button onclick="setScale(16)">16</button>
+        <button onclick="setScale(24)" class="active">24</button>
+        <button onclick="setScale(32)">32</button>
+        <button onclick="setScale(48)">48</button>
+        <button onclick="setScale(64)">64</button>
+        <button onclick="setScale(96)">96</button>
+        <button onclick="setScale(128)">128</button>
+      </div>
+      <div class="view-toggle">
+        <button class="active" onclick="setView('grid')" id="btnGrid">Grid</button>
+        <button onclick="setView('single')" id="btnSingle">Single</button>
+      </div>
+      <button class="fullscreen-btn" onclick="toggleFullscreen()">Fullscreen</button>
+    </div>
+    <div class="canvas" id="canvas">
+      <div class="empty-state">Select one or more icon sets to begin</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SETS = [
+  {
+    id: 'phosphor', prefix: 'ph', name: 'Phosphor',
+    desc: 'Clean geometric, 6 weights. The most typographically sophisticated.',
+    count: 1500, license: 'MIT',
+    suffixes: ['', '-thin', '-light', '-bold', '-fill', '-duotone'],
+    sample: ['heart','house','gear','magnifying-glass','envelope','bell','user','star','camera','chat-circle','lightning','globe','music-note','book-open','rocket','palette','scissors','cloud','trophy','compass','crown','diamond','eye','flag','gift','key','leaf','map-pin','moon','sun','phone','shield','tag','tree','umbrella','waveform','wrench','x-circle','alarm','airplane','anchor','archive','arrow-right','arrow-left','battery-full','bluetooth','broadcast','bug','calculator','calendar','chart-bar','chart-line']
+  },
+  {
+    id: 'lucide', prefix: 'lucide', name: 'Lucide',
+    desc: 'Refined Feather fork. The modern standard. 1.5px stroke.',
+    count: 1600, license: 'ISC',
+    sample: ['heart','home','settings','search','mail','bell','user','star','camera','message-circle','zap','globe','music','book-open','rocket','palette','scissors','cloud','trophy','compass','crown','diamond','eye','flag','gift','key','leaf','map-pin','moon','sun','phone','shield','tag','tree-pine','umbrella','activity','wrench','x-circle','alarm-clock','plane','anchor','archive','arrow-right','arrow-left','battery-full','bluetooth','radio','bug','calculator','calendar']
+  },
+  {
+    id: 'heroicons', prefix: 'heroicons', name: 'Heroicons',
+    desc: 'Hand-crafted by Steve Schoger. Small set, every icon impeccable.',
+    count: 290, license: 'MIT',
+    sample: ['heart','home','cog-6-tooth','magnifying-glass','envelope','bell','user','star','camera','chat-bubble-left','bolt','globe-alt','musical-note','book-open','rocket-launch','paint-brush','scissors','cloud','trophy','compass','crown','eye','flag','gift','key','leaf','map-pin','moon','sun','phone','shield-check','tag','tree','umbrella','wrench','x-circle','alarm','paper-airplane','anchor','archive-box','arrow-right','arrow-left','battery-full','bluetooth','bug-ant','calculator','calendar']
+  },
+  {
+    id: 'tabler', prefix: 'tabler', name: 'Tabler',
+    desc: 'Massive set, 5900+ icons. Crisp 2px geometric stroke.',
+    count: 5900, license: 'MIT',
+    sample: ['heart','home','settings','search','mail','bell','user','star','camera','message-circle','bolt','world','music','book','rocket','palette','scissors','cloud','trophy','compass','crown','diamond','eye','flag','gift','key','leaf','map-pin','moon','sun','phone','shield','tag','tree','umbrella','activity','tool','circle-x','alarm','plane','anchor','archive','arrow-right','arrow-left','battery','bluetooth','broadcast','bug','calculator','calendar']
+  },
+  {
+    id: 'feather', prefix: 'fe', name: 'Feather',
+    desc: 'The original "simply beautiful" open set. A design classic.',
+    count: 287, license: 'MIT',
+    sample: ['heart','home','settings','search','mail','bell','user','star','camera','message-circle','zap','globe','music','book-open','send','edit-3','scissors','cloud','award','compass','eye','flag','gift','key','map-pin','moon','sun','phone','shield','tag','umbrella','activity','tool','x-circle','clock','navigation','anchor','archive','arrow-right','arrow-left','battery','bluetooth','cast','aperture','calendar']
+  },
+  {
+    id: 'radix', prefix: 'radix-icons', name: 'Radix',
+    desc: 'Tight 15×15 grid. Typographic density. By WorkOS.',
+    count: 332, license: 'MIT',
+    sample: ['heart','home','gear','magnifying-glass','envelope-closed','bell','person','star','camera','chat-bubble','lightning-bolt','globe','speaker-loud','reader','rocket','scissors','cloud','eye-open','bookmark','target','cube','component-1','dimension','frame','hand','layers','link-2','lock-closed','moon','sun','mobile','shield','crosshair','timer','mix','opacity','ruler-square','transform','value','zoom-in','arrow-right','arrow-left','calendar','code','counter-clockwise-clock']
+  },
+  {
+    id: 'iconoir', prefix: 'iconoir', name: 'Iconoir',
+    desc: 'French design sensibility. 1600+ clean, slightly rounded.',
+    count: 1600, license: 'MIT',
+    sample: ['heart','home','settings','search','mail','bell','user','star-outline','camera','chat-bubble','flash','globe','music-double-note','book','rocket','palette','scissors','cloud','trophy','compass','crown','diamond','eye-empty','flag','gift','key-alt','leaf','pin-alt','half-moon','sun-light','phone','shield','label','tree','umbrella','activity','tools','circle-x','alarm','airplane','anchor','archive','arrow-right','arrow-left','battery-full','bluetooth','antenna','bug','calculator','calendar']
+  },
+  {
+    id: 'remix', prefix: 'ri', name: 'Remix Icon',
+    desc: 'Neutral system-style. 3200+ icons, line + fill pairs.',
+    count: 3200, license: 'Apache 2.0',
+    sample: ['heart-line','home-line','settings-3-line','search-line','mail-line','notification-line','user-line','star-line','camera-line','chat-1-line','flashlight-line','global-line','music-line','book-open-line','rocket-line','palette-line','scissors-line','cloud-line','trophy-line','compass-3-line','vip-crown-line','diamond-line','eye-line','flag-line','gift-line','key-line','leaf-line','map-pin-line','moon-line','sun-line','phone-line','shield-line','price-tag-3-line','plant-line','umbrella-line','pulse-line','tools-line','close-circle-line','alarm-line','plane-line','anchor-line','archive-line','arrow-right-line','arrow-left-line','battery-line','bluetooth-line','broadcast-line','bug-line','calculator-line','calendar-line']
+  },
+  {
+    id: 'cssgg', prefix: 'gg', name: 'css.gg',
+    desc: 'Pure CSS geometry. Bauhaus logic. Icons from box-model primitives.',
+    count: 700, license: 'MIT',
+    sample: ['heart','home','options','search','mail','bell','user','star','camera','comment','bolt','globe','music-note','book','rocket','brush','scissors','cloud','trophy','compass','crown','diamond','eye','flag','gift','key','leaf','pin','moon','sun','phone','shield','tag','tree','umbrella','activity','tool','close-o','alarm','airplane','anchor','arrow-right','arrow-left','battery','bluetooth','broadcast','bug','calculator','calendar','chart']
+  },
+  {
+    id: 'bytesize', prefix: 'bytesize', name: 'Bytesize',
+    desc: 'Ultra-minimal, 101 icons. Stroke-controllable. Very Swiss.',
+    count: 101, license: 'MIT',
+    sample: ['heart','home','settings','search','mail','bell','user','star','camera','message','lightning','globe','music','book','send','edit','scissors','cloud','flag','eye','gift','key','moon','clock','phone','shield','tag','umbrella','activity','lock','arrow-right','arrow-left','calendar','code','compose','download','upload','folder','print','reload','trash','video','volume','work','alert','archive','backwards','bag','ban','chevron-right','fire']
+  },
+  {
+    id: 'teenyicons', prefix: 'teenyicons', name: 'Teenyicons',
+    desc: 'Hairline 1px stroke at 15px. Delicate precision.',
+    count: 1000, license: 'MIT',
+    sample: ['heart-outline','home-outline','cog-outline','search-outline','envelope-outline','bell-outline','user-circle-outline','star-outline','camera-outline','message-outline','bolt-outline','globe-outline','headphones-outline','book-outline','send-outline','brush-outline','scissors-outline','cloud-outline','trophy-outline','compass-outline','crown-outline','diamond-outline','eye-outline','flag-outline','gift-outline','key-outline','leaf-outline','pin-outline','moon-outline','sun-outline','phone-outline','shield-outline','tag-outline','tree-outline','umbrella-outline','activity-outline','wrench-outline','x-circle-outline','alarm-outline','plane-outline','anchor-outline','archive-outline','arrow-right-outline','arrow-left-outline','battery-charge-outline','bluetooth-outline','broadcast-outline','bug-outline','calculator-outline','calendar-outline']
+  },
+  {
+    id: 'eva', prefix: 'eva', name: 'Eva Icons',
+    desc: 'Friendly, rounded. 480+ icons with built-in animations.',
+    count: 480, license: 'MIT',
+    sample: ['heart-outline','home-outline','settings-2-outline','search-outline','email-outline','bell-outline','person-outline','star-outline','camera-outline','message-circle-outline','flash-outline','globe-outline','headphones-outline','book-outline','paper-plane-outline','brush-outline','scissors-outline','cloud-upload-outline','award-outline','compass-outline','eye-outline','flag-outline','gift-outline','lock-outline','map-outline','moon-outline','sun-outline','phone-outline','shield-outline','pin-outline','umbrella-outline','activity-outline','pantone-outline','close-circle-outline','clock-outline','navigation-outline','archive-outline','arrow-forward-outline','arrow-back-outline','battery-outline','bluetooth-outline','cast-outline','code-outline','calendar-outline','cube-outline']
+  },
+  {
+    id: 'akar', prefix: 'akar-icons', name: 'Akar Icons',
+    desc: 'Perfectly rounded terminals. Friendly, consistent radii.',
+    count: 454, license: 'MIT',
+    sample: ['heart','home','gear','search','envelope','bell','person','star','camera','chat-bubble','thunder','globe','music-note','book','paper-airplane','scissor','cloud','trophy','compass','crown','diamond','eye-open','flag','gift','key','leaf','location','moon','sun','phone','shield','tag','umbrella','graph','circle-x','alarm','air','arrow-right','arrow-left','battery-full','bluetooth','calendar','calculator','chat-question','circle-check','clipboard','copy','download','file','folder']
+  },
+  {
+    id: 'mono', prefix: 'mi', name: 'Mono Icons',
+    desc: 'By Mono Company (Belgian studio). Restrained, purposeful.',
+    count: 136, license: 'MIT',
+    sample: ['heart','home','settings','search','mail','bell','user','star','camera','message','flash','globe','music','book','send','edit','scissors','cloud','flag','eye','gift','key','moon','sun','phone','shield','tag','clock','activity','lock','arrow-right','arrow-left','calendar','code','download','upload','folder','print','refresh','trash','attachment','filter','link','log-out','menu','notification','pin','sort','zoom-in','zoom-out']
+  },
+  {
+    id: 'unicons', prefix: 'uil', name: 'Unicons',
+    desc: 'By IconScout. 1200+ clean line icons, well-balanced weight.',
+    count: 1215, license: 'Apache 2.0',
+    sample: ['heart','home-alt','setting','search','envelope','bell','user','star','camera','comment','bolt','globe','music','book-open','message','brush-alt','scissors','cloud','trophy','compass','eye','flag-alt','gift','key-skeleton','leaf','map-marker','moon','sun','phone','shield','tag','trees','umbrella','graph-bar','times-circle','clock','navigation','anchor','archive','arrow-right','arrow-left','battery-bolt','bluetooth-b','broadcast','bug','calculator','calendar-alt','chart','cloud-download','code-branch']
+  }
+];
+
+let activeSets = new Set(['phosphor']);
+let currentScale = 24;
+let currentView = 'grid';
+let singleIndex = 0;
+let allVisibleIcons = [];
+
+// Build sidebar
+function renderSidebar() {
+  const el = document.getElementById('setList');
+  el.innerHTML = SETS.map((s, i) => `
+    <div class="set-item ${activeSets.has(s.id) ? 'active' : ''}" data-id="${s.id}" onclick="toggleSet('${s.id}')">
+      <div class="check">${activeSets.has(s.id) ? '✓' : ''}</div>
+      <div class="set-info">
+        <div class="set-name">${s.name}</div>
+        <div class="set-meta">${s.count} icons · ${s.license}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleSet(id) {
+  if (activeSets.has(id)) activeSets.delete(id);
+  else activeSets.add(id);
+  renderSidebar();
+  renderCanvas();
+}
+
+function selectAll() {
+  SETS.forEach(s => activeSets.add(s.id));
+  renderSidebar();
+  renderCanvas();
+}
+
+function selectNone() {
+  activeSets.clear();
+  renderSidebar();
+  renderCanvas();
+}
+
+// Scale
+const slider = document.getElementById('scaleSlider');
+slider.addEventListener('input', () => {
+  currentScale = parseInt(slider.value);
+  updateScale();
+});
+
+function setScale(v) {
+  currentScale = v;
+  slider.value = v;
+  updateScale();
+}
+
+function updateScale() {
+  document.getElementById('scaleValue').textContent = currentScale + 'px';
+  document.querySelectorAll('.scale-presets button').forEach(b => {
+    b.classList.toggle('active', parseInt(b.textContent) === currentScale);
+  });
+  renderCanvas();
+}
+
+// View
+function setView(v) {
+  currentView = v;
+  document.getElementById('btnGrid').classList.toggle('active', v === 'grid');
+  document.getElementById('btnSingle').classList.toggle('active', v === 'single');
+  singleIndex = 0;
+  renderCanvas();
+}
+
+// Fullscreen
+function toggleFullscreen() {
+  document.body.classList.toggle('fullscreen');
+}
+
+// Canvas
+function renderCanvas() {
+  const canvas = document.getElementById('canvas');
+  const active = SETS.filter(s => activeSets.has(s.id));
+
+  if (active.length === 0) {
+    canvas.innerHTML = '<div class="empty-state">Select one or more icon sets to begin</div>';
+    return;
+  }
+
+  if (currentView === 'single') {
+    renderSingleView(canvas, active);
+    return;
+  }
+
+  // Grid view
+  const cellSize = Math.max(currentScale + 12, 32);
+
+  canvas.innerHTML = active.map(s => {
+    const icons = buildIconList(s);
+    return `
+      <div class="set-section">
+        <div class="set-section-header">
+          <span class="set-section-title">${s.name}</span>
+          <span class="set-section-count">${icons.length} icons</span>
+          <span class="set-section-desc">${s.desc}</span>
+        </div>
+        <div class="icon-grid">
+          ${icons.map(icon => `
+            <div class="icon-cell" style="width:${cellSize}px">
+              <iconify-icon icon="${icon}" width="${currentScale}" height="${currentScale}"></iconify-icon>
+              <div class="tooltip">${icon}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function buildIconList(s) {
+  if (s.suffixes) {
+    // For sets with weight variants, show regular only
+    return s.sample.map(name => `${s.prefix}:${name}`);
+  }
+  return s.sample.map(name => `${s.prefix}:${name}`);
+}
+
+function renderSingleView(canvas, active) {
+  allVisibleIcons = [];
+  active.forEach(s => {
+    const icons = buildIconList(s);
+    icons.forEach(icon => allVisibleIcons.push({ icon, set: s.name }));
+  });
+
+  if (allVisibleIcons.length === 0) return;
+  if (singleIndex >= allVisibleIcons.length) singleIndex = 0;
+  if (singleIndex < 0) singleIndex = allVisibleIcons.length - 1;
+
+  const current = allVisibleIcons[singleIndex];
+  const displaySize = Math.max(currentScale * 3, 64);
+
+  canvas.innerHTML = `
+    <div class="single-view">
+      <div class="single-set-name">${current.set}</div>
+      <div class="single-icon-display">
+        <iconify-icon icon="${current.icon}" width="${displaySize}" height="${displaySize}"></iconify-icon>
+      </div>
+      <div class="single-icon-name">${current.icon}</div>
+      <div class="single-nav">
+        <button onclick="navSingle(-1)">← Prev</button>
+        <span class="single-icon-name">${singleIndex + 1} / ${allVisibleIcons.length}</span>
+        <button onclick="navSingle(1)">Next →</button>
+      </div>
+    </div>
+  `;
+}
+
+function navSingle(dir) {
+  singleIndex += dir;
+  renderCanvas();
+}
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (e.key === 'f' || e.key === 'F') {
+    if (e.target.tagName === 'INPUT') return;
+    toggleFullscreen();
+  }
+  if (e.key === 'ArrowLeft') { singleIndex--; renderCanvas(); }
+  if (e.key === 'ArrowRight') { singleIndex++; renderCanvas(); }
+
+  const num = parseInt(e.key);
+  if (num >= 1 && num <= 9 && num <= SETS.length) {
+    if (e.target.tagName === 'INPUT') return;
+    toggleSet(SETS[num - 1].id);
+  }
+});
+
+// Init
+renderSidebar();
+renderCanvas();
+</script>
+</body>
+</html>

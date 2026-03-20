@@ -1,0 +1,8 @@
+{
+  "family": "icon-sampler",
+  "port": 3480,
+  "portPolicy": "strict",
+  "category": "utility",
+  "entrypoint": "index.html",
+  "framework": "static"
+}
