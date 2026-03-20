@@ -851,6 +851,18 @@ function iconBaseName(name) {
     .replace(/-alt\d*$/g, '');
 }
 
+function findIconMatch(iconName, icons) {
+  const baseName = iconBaseName(iconName);
+  if (baseName.length < 2) return -1;
+  // Exact match
+  let idx = icons.findIndex(ic => ic.icon.split(':')[1] === iconName);
+  // Base name match
+  if (idx === -1) idx = icons.findIndex(ic => iconBaseName(ic.icon.split(':')[1]) === baseName);
+  // Candidate contains our base name (not reverse — too loose)
+  if (idx === -1 && baseName.length >= 3) idx = icons.findIndex(ic => iconBaseName(ic.icon.split(':')[1]).includes(baseName));
+  return idx;
+}
+
 async function navSet(dir) {
   const visible = searchFilter
     ? SETS.filter(s => s.name.toLowerCase().includes(searchFilter) || s.author.toLowerCase().includes(searchFilter) || s.tier.toLowerCase().includes(searchFilter))
@@ -865,25 +877,30 @@ async function navSet(dir) {
     if (cur) matchIconName = cur.icon.split(':')[1];
   }
 
-  let idx = currentId ? visible.findIndex(s => s.id === currentId) : -1;
-  idx += dir;
-  if (idx < 0) idx = visible.length - 1;
-  if (idx >= visible.length) idx = 0;
-  await loadSet(visible[idx].id);
+  let startIdx = currentId ? visible.findIndex(s => s.id === currentId) : -1;
+  let idx = startIdx;
 
-  // Try to match the same icon in the new set
-  if (matchIconName && currentView === 'single' && allVisibleIcons.length) {
-    const baseName = iconBaseName(matchIconName);
-    // Exact match first
-    let matchIdx = allVisibleIcons.findIndex(ic => ic.icon.split(':')[1] === matchIconName);
-    // Base name match
-    if (matchIdx === -1) matchIdx = allVisibleIcons.findIndex(ic => iconBaseName(ic.icon.split(':')[1]) === baseName);
-    // Partial/contains match
-    if (matchIdx === -1) matchIdx = allVisibleIcons.findIndex(ic => ic.icon.split(':')[1].includes(baseName) || baseName.includes(iconBaseName(ic.icon.split(':')[1])));
-    if (matchIdx !== -1) {
-      singleIndex = matchIdx;
-      renderCanvas();
+  // If in single view with a match name, skip sets that don't have it
+  if (matchIconName && currentView === 'single') {
+    const maxTries = visible.length;
+    for (let tries = 0; tries < maxTries; tries++) {
+      idx += dir;
+      if (idx < 0) idx = visible.length - 1;
+      if (idx >= visible.length) idx = 0;
+      if (idx === startIdx) break; // wrapped around, no match anywhere
+      await loadSet(visible[idx].id);
+      const matchIdx = findIconMatch(matchIconName, allVisibleIcons);
+      if (matchIdx !== -1) {
+        singleIndex = matchIdx;
+        renderCanvas();
+        break;
+      }
     }
+  } else {
+    idx += dir;
+    if (idx < 0) idx = visible.length - 1;
+    if (idx >= visible.length) idx = 0;
+    await loadSet(visible[idx].id);
   }
 
   // Scroll active item into view
