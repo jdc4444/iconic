@@ -673,11 +673,11 @@ function filterSets(q) {
   renderSidebar();
 }
 
-function loadSet(id) {
+async function loadSet(id) {
   activeSets.clear();
   activeSets.add(id);
   renderSidebar();
-  renderCanvas();
+  await renderCanvas();
   syncFsSelect();
 }
 
@@ -868,17 +868,49 @@ function animateIcons() {
 
 function navSingle(dir) { singleIndex += dir; renderCanvas(); }
 
-function navSet(dir) {
+// Strip variant suffixes to get a base icon name for cross-set matching
+function iconBaseName(name) {
+  return name
+    .replace(/-(thin|light|bold|duotone|fill|filled|solid|outline|outlined|regular|sharp|twotone|broken|linear|bulk)$/g, '')
+    .replace(/-(12|16|20|24|32|48)$/g, '')
+    .replace(/-alt\d*$/g, '');
+}
+
+async function navSet(dir) {
   const visible = searchFilter
     ? SETS.filter(s => s.name.toLowerCase().includes(searchFilter) || s.author.toLowerCase().includes(searchFilter) || s.tier.toLowerCase().includes(searchFilter))
     : SETS;
   if (!visible.length) return;
   const currentId = activeSets.size === 1 ? [...activeSets][0] : null;
+
+  // Remember current icon name for cross-set matching in single view
+  let matchIconName = null;
+  if (currentView === 'single' && currentId && allVisibleIcons.length) {
+    const cur = allVisibleIcons[singleIndex];
+    if (cur) matchIconName = cur.icon.split(':')[1];
+  }
+
   let idx = currentId ? visible.findIndex(s => s.id === currentId) : -1;
   idx += dir;
   if (idx < 0) idx = visible.length - 1;
   if (idx >= visible.length) idx = 0;
-  loadSet(visible[idx].id);
+  await loadSet(visible[idx].id);
+
+  // Try to match the same icon in the new set
+  if (matchIconName && currentView === 'single' && allVisibleIcons.length) {
+    const baseName = iconBaseName(matchIconName);
+    // Exact match first
+    let matchIdx = allVisibleIcons.findIndex(ic => ic.icon.split(':')[1] === matchIconName);
+    // Base name match
+    if (matchIdx === -1) matchIdx = allVisibleIcons.findIndex(ic => iconBaseName(ic.icon.split(':')[1]) === baseName);
+    // Partial/contains match
+    if (matchIdx === -1) matchIdx = allVisibleIcons.findIndex(ic => ic.icon.split(':')[1].includes(baseName) || baseName.includes(iconBaseName(ic.icon.split(':')[1])));
+    if (matchIdx !== -1) {
+      singleIndex = matchIdx;
+      renderCanvas();
+    }
+  }
+
   // Scroll active item into view
   const el = document.querySelector('.set-item.active');
   if (el) el.scrollIntoView({ block: 'nearest' });
