@@ -630,6 +630,8 @@
   .btn-cat-grid.dark-bg {
     background: #1a1a2e; padding: 16px; border-radius: 8px; margin: -4px;
   }
+  body.btn-desaturate .demo-btn { filter: grayscale(1); }
+  body.btn-desaturate .demo-btn:hover { filter: grayscale(0); }
 
   .demo-btn {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -1127,6 +1129,7 @@ function toggleLikedFilter() {
 function toggleFilter(type) {
   activeFilter = activeFilter === type ? null : type;
   if (activeFilter) showAll = false;
+  document.body.classList.toggle('btn-desaturate', activeFilter === 'dark' && appMode === 'buttons');
   renderSidebar();
   renderCanvas();
   renderControls(appMode);
@@ -2782,7 +2785,23 @@ const BUTTON_CATALOG = [
   ]},
 ];
 
-
+// Dedup buttons: remove same-design-different-color within each category
+(() => {
+  function norm(s) {
+    return s.replace(/#[0-9a-fA-F]{3,8}/g, '#X')
+            .replace(/rgba?\([^)]+\)/g, 'C')
+            .replace(/hsla?\([^)]+\)/g, 'C');
+  }
+  for (const cat of BUTTON_CATALOG) {
+    const seen = new Set();
+    cat.buttons = cat.buttons.filter(b => {
+      const key = norm(b.style);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+})();
 
 // === LOADING ANIMATION CATALOG ===
 const L = (label, s, inner='') => ({ label, style: s, inner });
