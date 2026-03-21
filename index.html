@@ -1479,33 +1479,64 @@ async function renderCanvas() {
   canvas.style.overflowX = 'auto';
   canvas.style.flexDirection = '';
 
-  const active = SETS.filter(s => activeSets.has(s.id));
+  // When searching, show matching icons from ALL sets (fetched on demand)
+  // When not searching, show only the active/selected set(s)
+  let displaySets;
+  if (searchFilter) {
+    // Show sets that have matching icons (from sidebar's filtered list)
+    displaySets = SETS.filter(s => {
+      if (hiddenSets.has(s.id)) return false;
+      // Apply type filter
+      if (activeFilter === 'color' && !s.palette) return false;
+      if (activeFilter === 'animated' && !s.animated) return false;
+      if (activeFilter === 'stroke' && !s.stroke) return false;
+      if (activeFilter === 'emoji' && s.tier !== 'Emoji') return false;
+      if (activeFilter === 'logos' && s.tier !== 'Logos') return false;
+      if (activeFilter === 'material' && s.tier !== 'Material') return false;
+      if (activeFilter === 'liked' && !likedSets.has(s.id)) return false;
+      // Check if set name/author matches OR if cached icons match
+      if (s.name.toLowerCase().includes(searchFilter) || s.author.toLowerCase().includes(searchFilter)) return true;
+      const cached = iconCache[s.prefix];
+      if (cached) return cached.some(name => name.toLowerCase().includes(searchFilter));
+      return s.sample.some(name => name.toLowerCase().includes(searchFilter));
+    });
+  } else {
+    displaySets = SETS.filter(s => activeSets.has(s.id));
+  }
 
-  if (!active.length) {
+  if (!displaySets.length) {
     canvas.innerHTML = '<div class="empty-state">Select an icon set to begin</div>';
     return;
   }
 
-  // Fetch icons for all active sets
-  const needsFetch = active.filter(s => !iconCache[s.prefix]);
+  // Fetch icons for sets that need it
+  const needsFetch = displaySets.filter(s => !iconCache[s.prefix]);
   if (needsFetch.length) {
-    canvas.innerHTML = '<div class="empty-state">Loading icons...</div>';
+    canvas.innerHTML = `<div class="empty-state">Loading icons from ${needsFetch.length} set${needsFetch.length > 1 ? 's' : ''}...</div>`;
     await Promise.all(needsFetch.map(s => fetchIcons(s.prefix)));
+    // Re-filter after fetch — some sets may have no matches once icons are loaded
+    if (searchFilter) {
+      displaySets = displaySets.filter(s => {
+        const icons = getIcons(s);
+        return icons.length > 0;
+      });
+    }
   }
 
-  if (currentView === 'single' || currentView === 'versions') return renderSingleView(canvas, active);
+  if (currentView === 'single' || currentView === 'versions') return renderSingleView(canvas, displaySets);
 
   const cellSize = Math.max(currentScale + 8, 28);
   // Build allVisibleIcons for click-to-single
   allVisibleIcons = [];
-  active.forEach(s => {
+  displaySets.forEach(s => {
     const names = getIcons(s);
-    names.forEach(n => allVisibleIcons.push({ icon: `${s.prefix}:${n}`, set: s.name }));
+    names.forEach(n => allVisibleIcons.push({ icon: `${s.prefix}:${n}`, set: s.name, prefix: s.prefix }));
   });
 
   let globalIdx = 0;
-  canvas.innerHTML = active.map(s => {
+  canvas.innerHTML = displaySets.map(s => {
     const names = getIcons(s);
+    if (!names.length) return '';
     const icons = names.map(n => `${s.prefix}:${n}`);
     const html = `<div class="set-section">
       <div class="set-section-header">
