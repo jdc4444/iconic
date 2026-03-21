@@ -6,5 +6,5 @@
   "entrypoint": "index.html",
   "framework": "static",
   "startCommand": "python3",
-  "startArgs": ["-m", "http.server", "3480"]
+  "startArgs": ["server.py", "3480"]
 }

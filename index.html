@@ -1870,11 +1870,11 @@ document.getElementById('canvas').addEventListener('wheel', e => {
   canvas.scrollLeft += e.deltaY + e.deltaX;
 }, { passive: false });
 
-// Persist state to localStorage
+// Persist state to disk (prefs.json) and localStorage as fallback
 const STORAGE_KEY = 'icon-sampler-state';
 
-function saveState() {
-  const state = {
+function buildState() {
+  return {
     scale: currentScale,
     view: currentView,
     sortMode,
@@ -1889,32 +1889,55 @@ function saveState() {
     activeButtonCat: activeButtonCats.size === 1 ? [...activeButtonCats][0] : null,
     sidebarWidth: sidebar.style.width || null,
   };
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
 }
 
-function restoreState() {
+let saveTimer = null;
+function saveState() {
+  const state = buildState();
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+  // Debounce disk writes to avoid hammering on rapid changes
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    fetch('/prefs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state),
+    }).catch(() => {}); // silent fail if server not available
+  }, 300);
+}
+
+function applyState(s) {
+  if (s.scale) { currentScale = s.scale; updateScale(); }
+  if (s.view) setView(s.view);
+  if (s.sortMode) setSortMode(s.sortMode);
+  if (s.activeFilter) toggleFilter(s.activeFilter);
+  if (s.appMode) setMode(s.appMode);
+  if (s.dark) toggleDark();
+  if (s.liked) s.liked.forEach(id => likedIcons.add(id));
+  if (s.hidden) s.hidden.forEach(id => hiddenIcons.add(id));
+  if (s.likedSets) { likedSets.clear(); s.likedSets.forEach(id => likedSets.add(id)); }
+  if (s.hiddenSets) s.hiddenSets.forEach(id => hiddenSets.add(id));
+  if (s.activeSet) { activeSets.clear(); activeSets.add(s.activeSet); }
+  if (s.activeButtonCat != null) { activeButtonCats.clear(); activeButtonCats.add(s.activeButtonCat); }
+  if (s.sidebarWidth) sidebar.style.width = s.sidebarWidth;
+}
+
+async function restoreState() {
+  // Try disk first (prefs.json), fall back to localStorage
+  try {
+    const res = await fetch('/prefs');
+    if (res.ok) {
+      const s = await res.json();
+      if (s && Object.keys(s).length > 0) { applyState(s); return; }
+    }
+  } catch {}
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const s = JSON.parse(raw);
-    if (s.scale) { currentScale = s.scale; updateScale(); }
-    if (s.view) setView(s.view);
-    if (s.sortMode) setSortMode(s.sortMode);
-    if (s.activeFilter) toggleFilter(s.activeFilter);
-    if (s.appMode) setMode(s.appMode);
-    if (s.dark) toggleDark();
-    if (s.liked) s.liked.forEach(id => likedIcons.add(id));
-    if (s.hidden) s.hidden.forEach(id => hiddenIcons.add(id));
-    if (s.likedSets) s.likedSets.forEach(id => likedSets.add(id));
-    if (s.hiddenSets) s.hiddenSets.forEach(id => hiddenSets.add(id));
-    if (s.activeSet) { activeSets.clear(); activeSets.add(s.activeSet); }
-    if (s.activeButtonCat != null) { activeButtonCats.clear(); activeButtonCats.add(s.activeButtonCat); }
-    if (s.sidebarWidth) sidebar.style.width = s.sidebarWidth;
+    if (raw) applyState(JSON.parse(raw));
   } catch {}
 }
 
-restoreState();
-loadCollections();
+restoreState().then(() => loadCollections());
 </script>
 </body>
 </html>
