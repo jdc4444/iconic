@@ -716,7 +716,7 @@ let selectedVariant = null; // specific variant in single view
 let activeFilter = null; // null, 'color', or 'animated'
 let appMode = 'icons'; // 'icons' or 'buttons'
 const likedIcons = new Set(); // stores liked icon identifiers (prefix:name)
-const likedSets = new Set(); // liked icon set prefixes
+const likedSets = new Set(['lucide', 'lucide-lab']); // liked icon set prefixes
 const hiddenSets = new Set(); // hidden icon set prefixes
 const iconCache = {}; // prefix -> [icon names]
 
