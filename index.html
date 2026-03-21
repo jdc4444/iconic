@@ -379,6 +379,52 @@
 
   .single-nav button:hover { background: var(--fg); color: var(--bg); }
 
+  .variant-line {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    max-width: 500px;
+  }
+
+  .variant-line .variant-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.1s;
+    opacity: 0.5;
+  }
+
+  .variant-line .variant-icon:hover { background: var(--hover); opacity: 1; }
+  .variant-line .variant-icon.current { opacity: 1; background: var(--hover); }
+
+  .versions-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    max-width: 700px;
+  }
+
+  .version-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .version-card:hover { background: var(--hover); }
+  .version-card .version-label { font-size: 9px; color: var(--muted); max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
   .single-icon-name { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .single-set-name { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 
@@ -486,7 +532,7 @@
       <input type="text" id="searchInput" placeholder="Search sets..." oninput="filterSets(this.value)">
     </div>
     <div class="keyboard-hint">
-      <kbd>↑</kbd><kbd>↓</kbd> Sets <kbd>←</kbd><kbd>→</kbd> Single <kbd>F</kbd> Full <kbd>D</kbd> Dark <kbd>Esc</kbd> Exit
+      <kbd>↑</kbd><kbd>↓</kbd> Sets <kbd>←</kbd><kbd>→</kbd> Icons <kbd>Space</kbd> Versions <kbd>F</kbd> Full <kbd>D</kbd> Dark <kbd>Esc</kbd> Exit
     </div>
   </div>
 
@@ -509,6 +555,7 @@
       <div class="view-toggle">
         <button class="active" onclick="setView('grid')" id="btnGrid">Grid</button>
         <button onclick="setView('single')" id="btnSingle">Single</button>
+        <button onclick="setView('versions')" id="btnVersions">Versions</button>
       </div>
       <button class="tb-btn" onclick="toggleFullscreen()">Fullscreen</button>
       <button class="tb-btn" onclick="toggleDark()" id="btnDark">Dark</button>
@@ -545,6 +592,7 @@ let singleIndex = 0;
 let allVisibleIcons = [];
 let searchFilter = '';
 let sortMode = 'category'; // 'category' or 'name'
+let selectedVariant = null; // specific variant in single view
 const iconCache = {}; // prefix -> [icon names]
 
 async function loadCollections() {
@@ -675,7 +723,8 @@ function setView(v) {
   currentView = v;
   document.getElementById('btnGrid').classList.toggle('active', v === 'grid');
   document.getElementById('btnSingle').classList.toggle('active', v === 'single');
-  singleIndex = 0;
+  document.getElementById('btnVersions').classList.toggle('active', v === 'versions');
+  if (v === 'grid') singleIndex = 0;
   renderCanvas();
 }
 
@@ -754,7 +803,7 @@ async function renderCanvas() {
     await Promise.all(needsFetch.map(s => fetchIcons(s.prefix)));
   }
 
-  if (currentView === 'single') return renderSingleView(canvas, active);
+  if (currentView === 'single' || currentView === 'versions') return renderSingleView(canvas, active);
 
   const cellSize = Math.max(currentScale + 8, 28);
   // Build allVisibleIcons for click-to-single
@@ -788,18 +837,78 @@ async function renderCanvas() {
   animateIcons();
 }
 
+function getVariants(baseName, icons) {
+  return icons.filter(ic => {
+    const name = ic.icon.split(':')[1];
+    return iconBaseName(name) === baseName;
+  });
+}
+
+function getUniqueBaseIcons(icons) {
+  const seen = new Set();
+  const result = [];
+  for (const ic of icons) {
+    const base = iconBaseName(ic.icon.split(':')[1]);
+    if (!seen.has(base)) {
+      seen.add(base);
+      result.push(ic);
+    }
+  }
+  return result;
+}
+
 function renderSingleView(canvas, active) {
   allVisibleIcons = [];
   active.forEach(s => {
     const names = getIcons(s);
-    names.forEach(n => allVisibleIcons.push({ icon: `${s.prefix}:${n}`, set: s.name }));
+    names.forEach(n => allVisibleIcons.push({ icon: `${s.prefix}:${n}`, set: s.name, prefix: s.prefix }));
   });
   if (!allVisibleIcons.length) return;
-  if (singleIndex >= allVisibleIcons.length) singleIndex = 0;
-  if (singleIndex < 0) singleIndex = allVisibleIcons.length - 1;
 
-  const c = allVisibleIcons[singleIndex];
-  const sz = Math.max(currentScale * 3, 64);
+  // For single/versions, navigate by unique base icons
+  const uniqueIcons = getUniqueBaseIcons(allVisibleIcons);
+  if (singleIndex >= uniqueIcons.length) singleIndex = 0;
+  if (singleIndex < 0) singleIndex = uniqueIcons.length - 1;
+
+  const baseIcon = uniqueIcons[singleIndex];
+  const baseName = iconBaseName(baseIcon.icon.split(':')[1]);
+  const variants = getVariants(baseName, allVisibleIcons);
+  // Use selected variant if it matches current base, otherwise use base icon
+  const c = (selectedVariant && iconBaseName(selectedVariant.split(':')[1]) === baseName)
+    ? (allVisibleIcons.find(ic => ic.icon === selectedVariant) || baseIcon)
+    : baseIcon;
+  const sz = Math.max(currentScale, 200);
+
+  if (currentView === 'versions') {
+    // Full versions view — all variants displayed larger
+    canvas.innerHTML = `<div class="single-view">
+      <div class="single-set-name">${c.set}</div>
+      <div class="single-icon-name" style="font-size:13px;font-weight:600;margin-bottom:8px">${baseName}</div>
+      <div class="versions-grid">${variants.map((v, i) => {
+        const vName = v.icon.split(':')[1];
+        const suffix = vName.replace(baseName, '').replace(/^-/, '') || 'default';
+        return `<div class="version-card" onclick="selectVariant('${v.icon}')">
+          <iconify-icon icon="${v.icon}" width="48" height="48"></iconify-icon>
+          <div class="version-label" title="${vName}">${suffix}</div>
+        </div>`;
+      }).join('')}</div>
+      <div class="single-icon-name">${variants.length} variant${variants.length !== 1 ? 's' : ''}</div>
+      <div class="single-nav">
+        <button onclick="navSingle(-1)">&larr; Prev</button>
+        <span class="single-icon-name">${singleIndex + 1} / ${uniqueIcons.length}</span>
+        <button onclick="navSingle(1)">Next &rarr;</button>
+      </div>
+    </div>`;
+    return;
+  }
+
+  // Single view with variant line below
+  const variantHtml = variants.length > 1 ? `<div class="variant-line">${variants.map(v => {
+    const isCurrent = v.icon === c.icon;
+    return `<div class="variant-icon${isCurrent ? ' current' : ''}" onclick="selectVariant('${v.icon}')" title="${v.icon.split(':')[1]}">
+      <iconify-icon icon="${v.icon}" width="20" height="20"></iconify-icon>
+    </div>`;
+  }).join('')}</div>` : '';
 
   canvas.innerHTML = `<div class="single-view">
     <div class="single-set-name">${c.set}</div>
@@ -807,9 +916,10 @@ function renderSingleView(canvas, active) {
       <iconify-icon icon="${c.icon}" width="${sz}" height="${sz}"></iconify-icon>
     </div>
     <div class="single-icon-name">${c.icon}</div>
+    ${variantHtml}
     <div class="single-nav">
       <button onclick="navSingle(-1)">&larr; Prev</button>
-      <span class="single-icon-name">${singleIndex + 1} / ${allVisibleIcons.length}</span>
+      <span class="single-icon-name">${singleIndex + 1} / ${uniqueIcons.length}</span>
       <button onclick="navSingle(1)">Next &rarr;</button>
     </div>
   </div>`;
@@ -833,13 +943,32 @@ function animateIcons() {
   });
 }
 
-function navSingle(dir) { singleIndex += dir; renderCanvas(); }
+function navSingle(dir) { singleIndex += dir; selectedVariant = null; renderCanvas(); }
 
 function openSingle(idx) {
-  singleIndex = idx;
+  // Convert grid index to unique base icon index
+  if (allVisibleIcons.length) {
+    const targetIcon = allVisibleIcons[idx];
+    if (targetIcon) {
+      const baseName = iconBaseName(targetIcon.icon.split(':')[1]);
+      const uniqueIcons = getUniqueBaseIcons(allVisibleIcons);
+      const baseIdx = uniqueIcons.findIndex(ic => iconBaseName(ic.icon.split(':')[1]) === baseName);
+      singleIndex = baseIdx !== -1 ? baseIdx : 0;
+    }
+  }
   currentView = 'single';
-  document.getElementById('btnGrid').classList.remove('active');
-  document.getElementById('btnSingle').classList.add('active');
+  setView('single');
+}
+
+function selectVariant(fullIcon) {
+  // Find which base icon this variant belongs to and update singleIndex
+  const baseName = iconBaseName(fullIcon.split(':')[1]);
+  const uniqueIcons = getUniqueBaseIcons(allVisibleIcons);
+  const baseIdx = uniqueIcons.findIndex(ic => iconBaseName(ic.icon.split(':')[1]) === baseName);
+  if (baseIdx !== -1) singleIndex = baseIdx;
+  // In single view, switch the displayed icon to this variant
+  // We need to store which variant is selected
+  selectedVariant = fullIcon;
   renderCanvas();
 }
 
@@ -915,8 +1044,14 @@ document.addEventListener('keydown', e => {
   if (e.key === 'd' || e.key === 'D') toggleDark();
   if (e.key === 'ArrowUp') { e.preventDefault(); navSet(-1); }
   if (e.key === 'ArrowDown') { e.preventDefault(); navSet(1); }
-  if (e.key === 'ArrowLeft') { singleIndex--; renderCanvas(); }
-  if (e.key === 'ArrowRight') { singleIndex++; renderCanvas(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); navSingle(-1); }
+  if (e.key === 'ArrowRight') { e.preventDefault(); navSingle(1); }
+  if (e.key === ' ') {
+    e.preventDefault();
+    if (currentView === 'grid') setView('single');
+    else if (currentView === 'single') setView('versions');
+    else if (currentView === 'versions') setView('single');
+  }
 });
 
 // Resize handle
