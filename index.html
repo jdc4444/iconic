@@ -703,7 +703,7 @@
   .anim-flip { animation:anim-flip 2s ease-in-out infinite; }
   .anim-wiggle { animation:anim-wiggle 1s ease-in-out infinite; }
   .anim-pop { animation:anim-pop 1s ease-in-out infinite; }
-  .anim-slide { animation:anim-slide 0.6s ease-out both; }
+  .anim-slide { animation:anim-slide 0.6s ease-out infinite alternate; }
 </style>
 </head>
 <body>
@@ -742,6 +742,8 @@
         <button class="active" id="animPause" onclick="animTogglePause()" title="Pause/Stop" style="border-radius:0;border-left:none;border-right:none">⏸</button>
         <button id="animRight" onclick="animNext()" title="Play / Next animation" style="border-radius:0 3px 3px 0">›</button>
         <span id="animLabel" style="font-size:9px;color:var(--muted);min-width:40px;text-align:center;padding:0 4px;align-self:center"></span>
+        <button id="animLike" onclick="toggleAnimLike()" title="Like animation" style="font-size:9px;padding:1px 4px;margin-left:2px;border-radius:3px;border:1px solid var(--border);background:var(--bg);cursor:pointer;display:none">+</button>
+        <button id="animHide" onclick="toggleAnimHide()" title="Hide animation" style="font-size:9px;padding:1px 4px;border-radius:3px;border:1px solid var(--border);background:var(--bg);cursor:pointer;display:none">−</button>
       </div>
       <div class="view-toggle" style="margin-left:auto">
         <button class="active" id="tbAll" onclick="toggleFilter(null)">All</button>
@@ -809,6 +811,8 @@ let renderBatchToken = 0; // cancels stale chunked renders
 let currentAnim = null; // current animation class name or null
 const ANIM_LIST = ['anim-pulse','anim-spin','anim-bounce','anim-shimmer','anim-glow','anim-fade','anim-shake','anim-float','anim-flip','anim-wiggle','anim-pop','anim-slide'];
 let animCycleTimer = null;
+let likedAnims = new Set();
+let hiddenAnims = new Set();
 
 async function loadCollections() {
   const canvas = document.getElementById('canvas');
@@ -3768,7 +3772,7 @@ function animNext() {
     animSetByIndex(animIdx);
     restartAnimTimer();
   } else {
-    animSetByIndex((animIdx + 1) % ANIM_LIST.length);
+    animSetByIndex(nextVisibleAnim(animIdx));
     restartAnimTimer();
   }
   updateAnimUI();
@@ -3776,7 +3780,7 @@ function animNext() {
 
 function animPrev() {
   // Left arrow: navigate back, don't change play/pause state
-  animSetByIndex(animIdx <= 0 ? ANIM_LIST.length - 1 : animIdx - 1);
+  animSetByIndex(prevVisibleAnim(animIdx));
   if (!animPaused) restartAnimTimer();
 }
 
@@ -3793,10 +3797,28 @@ function animTogglePause() {
   updateAnimUI();
 }
 
+function nextVisibleAnim(from) {
+  let idx = from;
+  for (let i = 0; i < ANIM_LIST.length; i++) {
+    idx = (idx + 1) % ANIM_LIST.length;
+    if (!hiddenAnims.has(ANIM_LIST[idx])) return idx;
+  }
+  return from; // all hidden, stay put
+}
+
+function prevVisibleAnim(from) {
+  let idx = from;
+  for (let i = 0; i < ANIM_LIST.length; i++) {
+    idx = idx <= 0 ? ANIM_LIST.length - 1 : idx - 1;
+    if (!hiddenAnims.has(ANIM_LIST[idx])) return idx;
+  }
+  return from;
+}
+
 function restartAnimTimer() {
   clearInterval(animCycleTimer);
   animCycleTimer = setInterval(() => {
-    animIdx = (animIdx + 1) % ANIM_LIST.length;
+    animIdx = nextVisibleAnim(animIdx);
     currentAnim = ANIM_LIST[animIdx];
     applyAnim();
     updateAnimUI();
@@ -3811,10 +3833,20 @@ function updateAnimUI() {
     pauseBtn.textContent = '⏸';
     pauseBtn.classList.toggle('active', animPaused);
   }
-  // Right arrow shows play state
   const rightBtn = document.getElementById('animRight');
-  if (rightBtn) {
-    rightBtn.classList.toggle('active', !animPaused);
+  if (rightBtn) rightBtn.classList.toggle('active', !animPaused);
+  // +/- buttons
+  const likeBtn = document.getElementById('animLike');
+  const hideBtn = document.getElementById('animHide');
+  if (likeBtn && hideBtn) {
+    const show = !!currentAnim;
+    likeBtn.style.display = show ? '' : 'none';
+    hideBtn.style.display = show ? '' : 'none';
+    if (show) {
+      likeBtn.textContent = likedAnims.has(currentAnim) ? '♥' : '+';
+      likeBtn.style.color = likedAnims.has(currentAnim) ? '#e53935' : '';
+      hideBtn.textContent = hiddenAnims.has(currentAnim) ? '↩' : '−';
+    }
   }
 }
 
@@ -3824,6 +3856,23 @@ function applyAnim() {
     for (const cls of ANIM_LIST) el.classList.remove(cls);
     if (currentAnim) el.classList.add(currentAnim);
   }
+}
+
+function toggleAnimLike() {
+  if (!currentAnim) return;
+  if (likedAnims.has(currentAnim)) likedAnims.delete(currentAnim);
+  else likedAnims.add(currentAnim);
+  hiddenAnims.delete(currentAnim);
+  updateAnimUI();
+  saveState();
+}
+
+function toggleAnimHide() {
+  if (!currentAnim) return;
+  if (hiddenAnims.has(currentAnim)) hiddenAnims.delete(currentAnim);
+  else { hiddenAnims.add(currentAnim); likedAnims.delete(currentAnim); animNext(); return; }
+  updateAnimUI();
+  saveState();
 }
 
 // Scroll sync: as user scrolls grid, update sidebar selection to match visible category
@@ -3995,6 +4044,8 @@ function buildState() {
     activeButtonCat: activeButtonCats.size === 1 ? [...activeButtonCats][0] : null,
     activeLoadingCat: activeLoadingCats.size === 1 ? [...activeLoadingCats][0] : null,
     animIdx,
+    likedAnims: [...likedAnims],
+    hiddenAnims: [...hiddenAnims],
     sidebarWidth: sidebar.style.width || null,
   };
 }
@@ -4037,6 +4088,8 @@ function applyState(s) {
   if (s.activeButtonCat != null) { activeButtonCats.clear(); activeButtonCats.add(s.activeButtonCat); }
   if (s.activeLoadingCat != null) { activeLoadingCats.clear(); activeLoadingCats.add(s.activeLoadingCat); }
   if (s.animIdx != null && s.animIdx >= 0) { animIdx = s.animIdx; currentAnim = ANIM_LIST[animIdx]; animPaused = true; }
+  if (s.likedAnims) s.likedAnims.forEach(a => likedAnims.add(a));
+  if (s.hiddenAnims) s.hiddenAnims.forEach(a => hiddenAnims.add(a));
   if (s.sidebarWidth) sidebar.style.width = s.sidebarWidth;
 }
 

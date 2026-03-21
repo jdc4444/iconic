@@ -36,6 +36,11 @@
   "activeSet": "dashicons",
   "activeButtonCat": null,
   "activeLoadingCat": null,
-  "animIdx": 4,
+  "animIdx": 9,
+  "likedAnims": [],
+  "hiddenAnims": [
+    "anim-fade",
+    "anim-shake"
+  ],
   "sidebarWidth": null
 }
