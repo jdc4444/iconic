@@ -1766,11 +1766,17 @@ async function navSet(dir) {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { if (document.body.classList.contains('fullscreen')) toggleFullscreen(); return; }
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  const inInput = e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT';
+  // Allow ↑↓ arrow keys even when search input is focused
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    const dir = e.key === 'ArrowUp' ? -1 : 1;
+    appMode === 'buttons' ? navButtonCat(dir) : navSet(dir);
+    return;
+  }
+  if (inInput) return;
   if (e.key === 'f' || e.key === 'F') toggleFullscreen();
   if (e.key === 'd' || e.key === 'D') toggleDark();
-  if (e.key === 'ArrowUp') { e.preventDefault(); appMode === 'buttons' ? navButtonCat(-1) : navSet(-1); }
-  if (e.key === 'ArrowDown') { e.preventDefault(); appMode === 'buttons' ? navButtonCat(1) : navSet(1); }
   if (e.key === 'ArrowLeft') { e.preventDefault(); appMode === 'buttons' ? navButtonSingle(-1) : navSingle(-1); }
   if (e.key === 'ArrowRight') { e.preventDefault(); appMode === 'buttons' ? navButtonSingle(1) : navSingle(1); }
   if (e.key === ' ') {
