@@ -1,6 +1,6 @@
 {
-  "scale": 150,
-  "view": "grid",
+  "scale": 264,
+  "view": "versions",
   "sortMode": "category",
   "activeFilter": null,
   "appMode": "icons",

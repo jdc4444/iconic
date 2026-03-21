@@ -1515,58 +1515,104 @@ async function renderCanvas() {
     return;
   }
 
-  // Fetch icons for sets that need it
-  const needsFetch = displaySets.filter(s => !iconCache[s.prefix]);
-  if (needsFetch.length) {
-    canvas.innerHTML = `<div class="empty-state">Loading icons from ${needsFetch.length} set${needsFetch.length > 1 ? 's' : ''}...</div>`;
-    await Promise.all(needsFetch.map(s => fetchIcons(s.prefix)));
-    // Re-filter after fetch — some sets may have no matches once icons are loaded
-    if (searchFilter) {
-      displaySets = displaySets.filter(s => {
-        const icons = getIcons(s);
-        return icons.length > 0;
-      });
+  // Split into cached (render now) and uncached (fetch progressively)
+  const cached = displaySets.filter(s => iconCache[s.prefix]);
+  const uncached = displaySets.filter(s => !iconCache[s.prefix]);
+
+  // For non-search mode, fetch all needed sets before rendering
+  if (!searchFilter && uncached.length) {
+    canvas.innerHTML = '<div class="empty-state">Loading icons...</div>';
+    await Promise.all(uncached.map(s => fetchIcons(s.prefix)));
+    displaySets = displaySets.filter(s => getIcons(s).length > 0);
+  }
+
+  // For search mode, render cached results immediately, then stream uncached
+  if (searchFilter) {
+    // Filter cached sets to only those with actual matches
+    const readySets = cached.filter(s => getIcons(s).length > 0);
+    if (currentView === 'single' || currentView === 'versions') {
+      // For single/versions, wait for all to load first
+      if (uncached.length) await Promise.all(uncached.map(s => fetchIcons(s.prefix)));
+      displaySets = displaySets.filter(s => getIcons(s).length > 0);
+      return renderSingleView(canvas, displaySets);
     }
+    // Render what we have now
+    renderIconGrid(canvas, readySets);
+    // Fetch uncached sets progressively and append results
+    if (uncached.length) {
+      const currentSearch = searchFilter; // capture to detect stale renders
+      for (const s of uncached) {
+        await fetchIcons(s.prefix);
+        if (searchFilter !== currentSearch) return; // search changed, abort
+        const icons = getIcons(s);
+        if (icons.length > 0) appendSetToCanvas(canvas, s, icons);
+      }
+    }
+    return;
   }
 
   if (currentView === 'single' || currentView === 'versions') return renderSingleView(canvas, displaySets);
+  renderIconGrid(canvas, displaySets);
+}
 
+function buildSetHtml(s, gridStyle, cellSize) {
+  const names = getIcons(s);
+  if (!names.length) return { html: '', icons: [] };
+  const icons = names.map(n => ({ icon: `${s.prefix}:${n}`, set: s.name, prefix: s.prefix }));
+  const html = `<div class="set-section" data-prefix="${s.prefix}">
+    <div class="set-section-header">
+      <span class="set-section-title">${s.name}</span>
+      <span class="set-section-count">${icons.length.toLocaleString()} icons · ${s.license}</span>
+      <span class="set-section-author">${s.author}</span>
+    </div>
+    <div class="icon-grid" style="${gridStyle}">${icons.map(ic => {
+      return `<div class="icon-cell" style="width:${cellSize}px" data-icon="${ic.icon}">
+        <iconify-icon icon="${ic.icon}" width="${currentScale}" height="${currentScale}"></iconify-icon>
+        <div class="tooltip">${ic.icon}</div>
+      </div>`;
+    }).join('')}</div>
+  </div>`;
+  return { html, icons };
+}
+
+function renderIconGrid(canvas, sets) {
   const cellSize = Math.max(currentScale + 8, 28);
-  // Build allVisibleIcons for click-to-single
-  allVisibleIcons = [];
-  displaySets.forEach(s => {
-    const names = getIcons(s);
-    names.forEach(n => allVisibleIcons.push({ icon: `${s.prefix}:${n}`, set: s.name, prefix: s.prefix }));
-  });
-
-  // When searching: row-wrap grid (vertical scroll). Otherwise: column-wrap (horizontal scroll).
   const gridStyle = searchFilter
     ? 'flex-direction:row;align-content:flex-start;max-height:none'
     : '';
 
-  let globalIdx = 0;
-  canvas.innerHTML = displaySets.map(s => {
-    const names = getIcons(s);
-    if (!names.length) return '';
-    const icons = names.map(n => `${s.prefix}:${n}`);
-    const html = `<div class="set-section">
-      <div class="set-section-header">
-        <span class="set-section-title">${s.name}</span>
-        <span class="set-section-count">${icons.length.toLocaleString()} icons · ${s.license}</span>
-        <span class="set-section-author">${s.author}</span>
-      </div>
-      <div class="icon-grid" style="${gridStyle}">${icons.map(icon => {
-        const idx = globalIdx++;
-        return `<div class="icon-cell" style="width:${cellSize}px" onclick="openSingle(${idx})">
-          <iconify-icon icon="${icon}" width="${currentScale}" height="${currentScale}"></iconify-icon>
-          <div class="tooltip">${icon}</div>
-        </div>`;
-      }).join('')}</div>
-    </div>`;
-    return html;
-  }).join('');
-
+  allVisibleIcons = [];
+  const parts = [];
+  for (const s of sets) {
+    const { html, icons } = buildSetHtml(s, gridStyle, cellSize);
+    if (html) {
+      parts.push(html);
+      icons.forEach(ic => allVisibleIcons.push(ic));
+    }
+  }
+  canvas.innerHTML = parts.join('');
+  rebindIconClicks();
   animateIcons();
+}
+
+function appendSetToCanvas(canvas, s) {
+  const cellSize = Math.max(currentScale + 8, 28);
+  const gridStyle = 'flex-direction:row;align-content:flex-start;max-height:none';
+  const { html, icons } = buildSetHtml(s, gridStyle, cellSize);
+  if (!html) return;
+  icons.forEach(ic => allVisibleIcons.push(ic));
+  canvas.insertAdjacentHTML('beforeend', html);
+  rebindIconClicks();
+  animateIcons();
+}
+
+function rebindIconClicks() {
+  // Re-bind click handlers based on current allVisibleIcons order
+  document.querySelectorAll('.icon-cell[data-icon]').forEach(cell => {
+    const icon = cell.dataset.icon;
+    const idx = allVisibleIcons.findIndex(ic => ic.icon === icon);
+    if (idx !== -1) cell.onclick = () => openSingle(idx);
+  });
 }
 
 function getVariants(baseName, icons) {
@@ -1622,11 +1668,11 @@ function renderSingleView(canvas, active) {
     canvas.innerHTML = `<div class="single-view">
       <div class="single-set-name">${c.set}</div>
       <div class="single-icon-name" style="font-size:13px;font-weight:600;margin-bottom:8px">${baseName}</div>
-      <div class="versions-grid">${variants.map((v, i) => {
+      <div class="versions-grid" style="max-width:${Math.max(700, (currentScale + 40) * 5)}px">${variants.map((v, i) => {
         const vName = v.icon.split(':')[1];
         const suffix = vName.replace(baseName, '').replace(/^-/, '') || 'default';
         return `<div class="version-card" onclick="selectVariant('${v.icon}')">
-          <iconify-icon icon="${v.icon}" width="48" height="48"></iconify-icon>
+          <iconify-icon icon="${v.icon}" width="${currentScale}" height="${currentScale}"></iconify-icon>
           <div class="version-label" title="${vName}">${suffix}</div>
         </div>`;
       }).join('')}</div>
