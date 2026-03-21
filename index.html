@@ -3825,8 +3825,9 @@ function updateAnimUI() {
   const animName = animIdx >= 0 ? ANIM_LIST[animIdx] : null;
   if (label) label.textContent = animName ? animName.replace('anim-','') : '';
   if (pauseBtn) {
-    pauseBtn.textContent = animPaused ? '⏸' : '▶';
+    pauseBtn.textContent = '⏸';
     pauseBtn.classList.toggle('active', animPaused);
+    pauseBtn.style.opacity = animPaused ? '1' : '0.35';
   }
   // +/- buttons
   const likeBtn = document.getElementById('animLike');
