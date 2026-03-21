@@ -1102,7 +1102,7 @@ function searchMatch(text, query) {
 function toggleShowAll() {
   showAll = !showAll;
   if (showAll) {
-    activeFilter = null;
+    // All mode: deselect specific nav selections, but keep filters
     if (appMode === 'buttons') activeButtonCats.clear();
     if (appMode === 'loading') activeLoadingCats.clear();
     if (appMode === 'icons') { activeSets.clear(); activeSets.add('__all__'); }
@@ -1118,7 +1118,7 @@ function toggleLikedFilter() {
     activeFilter = null;
   } else {
     activeFilter = 'liked';
-    showAll = false;
+    // Don't touch showAll — liked is a filter, not a nav selection
   }
   renderSidebar();
   renderCanvas();
@@ -1128,7 +1128,7 @@ function toggleLikedFilter() {
 
 function toggleFilter(type) {
   activeFilter = activeFilter === type ? null : type;
-  if (activeFilter) showAll = false;
+  // Don't touch showAll — filters are orthogonal to All toggle
   document.body.classList.toggle('btn-desaturate', activeFilter === 'dark' && appMode === 'buttons');
   renderSidebar();
   renderCanvas();
