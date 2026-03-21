@@ -850,19 +850,25 @@ function renderSidebar() {
 
 function renderButtonSidebar(el) {
   let html = '';
+  const visibleCats = [];
   BUTTON_CATALOG.forEach((cat, i) => {
-    if (searchFilter && !cat.category.toLowerCase().includes(searchFilter) &&
-        !cat.buttons.some(b => b.label.toLowerCase().includes(searchFilter))) return;
+    const catMatch = cat.category.toLowerCase().includes(searchFilter);
+    const matchingBtns = searchFilter
+      ? cat.buttons.filter(b => catMatch || b.label.toLowerCase().includes(searchFilter))
+      : cat.buttons;
+    if (searchFilter && matchingBtns.length === 0) return;
+    visibleCats.push(i);
     const active = activeButtonCats.has(i) ? ' active' : '';
+    const count = searchFilter ? matchingBtns.length : cat.buttons.length;
     html += `<div class="set-item${active}" onclick="loadButtonCat(${i})">
       <div class="dot"></div>
       <div class="set-info"><div class="set-name">${cat.category}</div></div>
-      <div class="set-count">${cat.buttons.length}</div>
+      <div class="set-count">${count}</div>
     </div>`;
   });
   el.innerHTML = html;
   // Update search placeholder and hide icon-specific filters
-  document.getElementById('searchInput').placeholder = 'Search categories...';
+  document.getElementById('searchInput').placeholder = 'Search buttons...';
   document.querySelector('.sidebar-filters').style.display = 'none';
   document.querySelector('.sidebar-sort').style.display = 'none';
 }
@@ -1324,12 +1330,23 @@ function getActiveButtonCats() {
 
 function getAllVisibleButtons() {
   const result = [];
-  const cats = getActiveButtonCats();
-  for (const { idx, cat } of cats) {
-    cat.buttons.forEach((b, bi) => {
-      if (searchFilter && !b.label.toLowerCase().includes(searchFilter) && !cat.category.toLowerCase().includes(searchFilter)) return;
-      result.push({ catIdx: idx, btnIdx: bi, btn: b, category: cat.category, dark: !!cat.dark });
+  // When searching, show from ALL matching categories; otherwise only active
+  if (searchFilter) {
+    BUTTON_CATALOG.forEach((cat, idx) => {
+      const catMatch = cat.category.toLowerCase().includes(searchFilter);
+      cat.buttons.forEach((b, bi) => {
+        if (catMatch || b.label.toLowerCase().includes(searchFilter)) {
+          result.push({ catIdx: idx, btnIdx: bi, btn: b, category: cat.category, dark: !!cat.dark });
+        }
+      });
     });
+  } else {
+    const cats = getActiveButtonCats();
+    for (const { idx, cat } of cats) {
+      cat.buttons.forEach((b, bi) => {
+        result.push({ catIdx: idx, btnIdx: bi, btn: b, category: cat.category, dark: !!cat.dark });
+      });
+    }
   }
   return result;
 }
@@ -1765,14 +1782,23 @@ document.addEventListener('keydown', e => {
 });
 
 function navButtonCat(dir) {
-  const cats = BUTTON_CATALOG.map((_, i) => i);
+  // Build filtered list of category indices
+  const cats = [];
+  BUTTON_CATALOG.forEach((cat, i) => {
+    if (searchFilter) {
+      const catMatch = cat.category.toLowerCase().includes(searchFilter);
+      const hasMatch = cat.buttons.some(b => catMatch || b.label.toLowerCase().includes(searchFilter));
+      if (!hasMatch) return;
+    }
+    cats.push(i);
+  });
   if (!cats.length) return;
   const currentIdx = activeButtonCats.size === 1 ? [...activeButtonCats][0] : -1;
-  let idx = cats.indexOf(currentIdx);
-  idx += dir;
-  if (idx < 0) idx = cats.length - 1;
-  if (idx >= cats.length) idx = 0;
-  loadButtonCat(cats[idx]);
+  let pos = cats.indexOf(currentIdx);
+  pos += dir;
+  if (pos < 0) pos = cats.length - 1;
+  if (pos >= cats.length) pos = 0;
+  loadButtonCat(cats[pos]);
   const el = document.querySelector('.set-item.active');
   if (el) el.scrollIntoView({ block: 'nearest' });
 }
