@@ -352,8 +352,8 @@
   }
 
   @keyframes icon-enter {
-    from { opacity: 0; transform: translateY(8px) scale(0.85); filter: blur(2px); }
-    to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 
   .icon-cell {
@@ -369,7 +369,7 @@
   }
 
   .icon-cell.visible {
-    animation: icon-enter 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation: icon-enter 0.4s ease-out forwards;
   }
 
   .icon-cell:hover { background: var(--hover); }
@@ -3640,9 +3640,16 @@ function animateIcons() {
     });
   }, { rootMargin: '400px' });
 
-  document.querySelectorAll('.icon-cell:not(.visible)').forEach((cell, i) => {
-    const wave = Math.min(i % 50, 20) * 12;
-    cell.style.animationDelay = wave + 'ms';
+  const cells = document.querySelectorAll('.icon-cell:not(.visible)');
+  if (!cells.length) return;
+  // Calculate row based on vertical position for smooth top-to-bottom reveal
+  const firstTop = cells[0]?.getBoundingClientRect().top || 0;
+  const cellH = cells[0]?.offsetHeight || 58;
+  cells.forEach((cell) => {
+    const top = cell.getBoundingClientRect().top;
+    const row = Math.floor((top - firstTop) / (cellH + 1));
+    const delay = row * 30; // 30ms per row
+    cell.style.animationDelay = delay + 'ms';
     cell.addEventListener('animationend', () => { cell.style.animationDelay = ''; }, { once: true });
     observer.observe(cell);
   });
