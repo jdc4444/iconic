@@ -2968,6 +2968,18 @@ function renderButtonSingleView(canvas, allBtns) {
     <div style="font-size:10px;color:var(--muted);max-width:500px;word-break:break-all;text-align:center;margin-top:4px;flex-shrink:0">${c.btn.style}</div>
     ${singleNavHtml('navButtonSingle(-1)','navButtonSingle(1)',rateHtml,buttonSingleIndex,allBtns.length)}
   </div>`;
+  syncSidebarToCategory(c.catIdx, 'loadButtonCat');
+}
+
+function syncSidebarToCategory(catIdx, loadFn) {
+  // Highlight the right sidebar item and scroll it to center
+  document.querySelectorAll('.set-item').forEach(el => {
+    const onclick = el.getAttribute('onclick') || '';
+    const match = onclick.match(new RegExp(loadFn + '\\((\\d+)\\)'));
+    if (match) el.classList.toggle('active', parseInt(match[1]) === catIdx);
+  });
+  const activeEl = document.querySelector('.set-item.active');
+  if (activeEl) activeEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
 function openButtonSingle(idx) {
@@ -3151,6 +3163,7 @@ function renderLoadingSingleView(canvas, allItems) {
     <div class="single-nav" style="margin-top:16px;flex-shrink:0">
     ${singleNavHtml('navLoadingSingle(-1)','navLoadingSingle(1)',rateHtml,loadingSingleIndex,allItems.length)}
   </div>`;
+  syncSidebarToCategory(c.catIdx, 'loadLoadingCat');
 }
 
 function openLoadingSingle(idx) { loadingSingleIndex = idx; currentView = 'single'; setView('single'); }
@@ -3187,7 +3200,7 @@ function navLoadingCat(dir) {
   if (pos >= cats.length) pos = 0;
   loadLoadingCat(cats[pos]);
   const el = document.querySelector('.set-item.active');
-  if (el) el.scrollIntoView({ block: 'nearest' });
+  if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
 async function renderCanvas() {
@@ -3636,7 +3649,7 @@ async function navSet(dir) {
 
   // Scroll active item into view
   const el = document.querySelector('.set-item.active');
-  if (el) el.scrollIntoView({ block: 'nearest' });
+  if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
 // Scroll sync: as user scrolls grid, update sidebar selection to match visible category
@@ -3660,7 +3673,7 @@ function setupScrollSync(canvas, mode) {
         });
         // Scroll sidebar item into view
         const activeEl = document.querySelector('.set-item.active');
-        if (activeEl) activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        if (activeEl) activeEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
         break;
       }
     }
@@ -3710,7 +3723,7 @@ function navButtonCat(dir) {
   if (pos >= cats.length) pos = 0;
   loadButtonCat(cats[pos]);
   const el = document.querySelector('.set-item.active');
-  if (el) el.scrollIntoView({ block: 'nearest' });
+  if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
 // Resize handle

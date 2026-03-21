@@ -1,6 +1,6 @@
 {
   "scale": 58,
-  "view": "single",
+  "view": "grid",
   "sortMode": "category",
   "activeFilter": null,
   "appMode": "icons",
@@ -93,7 +93,7 @@
   "hiddenLoadingCatsList": [
     11
   ],
-  "activeSet": "whh",
+  "activeSet": null,
   "activeButtonCat": null,
   "activeLoadingCat": null,
   "sidebarWidth": null
