@@ -4074,7 +4074,7 @@ function applyState(s) {
   if (s.scale) { currentScale = s.scale; updateScale(); }
   // Always open on grid view
   if (s.sortMode) setSortMode(s.sortMode);
-  if (s.activeFilter) toggleFilter(s.activeFilter);
+  // Don't restore filter — start with no filter active
   if (s.appMode) setMode(s.appMode);
   if (s.dark) toggleDark();
   if (s.liked) s.liked.forEach(id => likedIcons.add(id));

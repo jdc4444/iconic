@@ -1,8 +1,8 @@
 {
   "scale": 58,
   "view": "grid",
-  "sortMode": "category",
-  "activeFilter": "material",
+  "sortMode": "name",
+  "activeFilter": null,
   "appMode": "icons",
   "dark": false,
   "liked": [],
@@ -33,7 +33,7 @@
   "hiddenLoadingCatsList": [
     11
   ],
-  "activeSet": "dashicons",
+  "activeSet": "__all__",
   "activeButtonCat": null,
   "activeLoadingCat": null,
   "animIdx": 2,
