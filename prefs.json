@@ -16,8 +16,10 @@
   "hiddenSets": [],
   "likedButtons": [],
   "hiddenButtons": [
-    "180:0",
-    "180:1"
+    "158:0",
+    "158:1",
+    "136:1",
+    "136:0"
   ],
   "likedButtonCats": [],
   "hiddenButtonCats": [
@@ -85,7 +87,7 @@
   "hiddenLoadingCatsList": [
     11
   ],
-  "activeSet": "lucide",
+  "activeSet": "dashicons",
   "activeButtonCat": null,
   "activeLoadingCat": null,
   "sidebarWidth": null
