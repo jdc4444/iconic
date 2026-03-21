@@ -205,6 +205,26 @@
 
   .set-item.active .set-count { color: rgba(255,255,255,0.5); }
 
+  .set-rate {
+    display: flex; gap: 2px; flex-shrink: 0; margin-left: 4px;
+  }
+  .set-rate button {
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: 1px solid var(--border);
+    border-radius: 50%; cursor: pointer;
+    color: var(--muted); font-size: 13px; font-family: inherit;
+    line-height: 1; padding: 0;
+    transition: all 0.1s;
+    opacity: 0;
+  }
+  .set-item:hover .set-rate button { opacity: 1; }
+  .set-rate button:hover { border-color: var(--fg); color: var(--fg); }
+  .set-rate button.set-liked { opacity: 1; background: var(--fg); border-color: var(--fg); color: var(--bg); }
+  .set-item.active .set-rate button { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.5); }
+  .set-item.active .set-rate button:hover { border-color: #fff; color: #fff; }
+  .set-item.active .set-rate button.set-liked { background: var(--bg); border-color: var(--bg); color: var(--fg); }
+
 
   .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
@@ -660,6 +680,8 @@ let selectedVariant = null; // specific variant in single view
 let activeFilter = null; // null, 'color', or 'animated'
 let appMode = 'icons'; // 'icons' or 'buttons'
 const likedIcons = new Set(); // stores liked icon identifiers (prefix:name)
+const likedSets = new Set(); // liked icon set prefixes
+const hiddenSets = new Set(); // hidden icon set prefixes
 const iconCache = {}; // prefix -> [icon names]
 
 async function loadCollections() {
@@ -714,6 +736,7 @@ function setMode(mode) {
   // TODO: switch sidebar content between icons and buttons
   renderSidebar();
   renderCanvas();
+  saveState();
 }
 
 function setSortMode(mode) {
@@ -721,6 +744,7 @@ function setSortMode(mode) {
   document.getElementById('btnSortCategory').classList.toggle('active', mode === 'category');
   document.getElementById('btnSortName').classList.toggle('active', mode === 'name');
   renderSidebar();
+  saveState();
 }
 
 function renderSidebar() {
@@ -739,6 +763,8 @@ function renderSidebar() {
   // Apply type filter
   if (activeFilter === 'color') filtered = filtered.filter(s => s.palette);
   if (activeFilter === 'animated') filtered = filtered.filter(s => s.animated);
+  // Hide sets removed with -
+  filtered = filtered.filter(s => !hiddenSets.has(s.id));
 
   if (sortMode === 'name') {
     filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
@@ -752,10 +778,15 @@ function renderSidebar() {
       lastTier = s.tier;
     }
     const active = activeSets.has(s.id) ? ' active' : '';
+    const liked = likedSets.has(s.id) ? ' set-liked' : '';
     html += `<div class="set-item${active}" onclick="loadSet('${s.id}')">
       <div class="dot"></div>
       <div class="set-info"><div class="set-name">${s.name}</div></div>
       <div class="set-count">${s.count.toLocaleString()}</div>
+      <div class="set-rate">
+        <button class="${liked ? 'set-liked' : ''}" onclick="event.stopPropagation();rateSet('${s.id}','minus')" title="Hide set">&minus;</button>
+        <button class="${liked}" onclick="event.stopPropagation();rateSet('${s.id}','plus')" title="${liked ? 'Unlike' : 'Like'}">&plus;</button>
+      </div>
     </div>`;
   }
   el.innerHTML = html;
@@ -771,6 +802,7 @@ function toggleFilter(type) {
   document.getElementById('filterColor').classList.toggle('active', activeFilter === 'color');
   document.getElementById('filterAnimated').classList.toggle('active', activeFilter === 'animated');
   renderSidebar();
+  saveState();
 }
 
 async function loadSet(id) {
@@ -779,6 +811,7 @@ async function loadSet(id) {
   renderSidebar();
   await renderCanvas();
   syncFsSelect();
+  saveState();
 }
 
 function selectAll() {
@@ -800,7 +833,7 @@ const fsSlider = document.getElementById('fsScaleSlider');
 slider.addEventListener('input', () => { currentScale = parseInt(slider.value); updateScale(); });
 fsSlider.addEventListener('input', () => { currentScale = parseInt(fsSlider.value); updateScale(); });
 
-function setScale(v) { currentScale = v; updateScale(); }
+function setScale(v) { currentScale = v; updateScale(); saveState(); }
 
 let scaleRenderTimer = null;
 function updateScale() {
@@ -813,7 +846,7 @@ function updateScale() {
   });
   // Debounce render for smooth pinch
   clearTimeout(scaleRenderTimer);
-  scaleRenderTimer = setTimeout(() => renderCanvas(), 50);
+  scaleRenderTimer = setTimeout(() => { renderCanvas(); saveState(); }, 50);
 }
 
 function setView(v) {
@@ -823,6 +856,7 @@ function setView(v) {
   document.getElementById('btnVersions').classList.toggle('active', v === 'versions');
   if (v === 'grid') singleIndex = 0;
   renderCanvas();
+  saveState();
 }
 
 function toggleFullscreen() { document.body.classList.toggle('fullscreen'); }
@@ -832,6 +866,7 @@ function toggleDark() {
   const d = document.body.classList.contains('dark');
   document.getElementById('btnDark').textContent = d ? 'Light' : 'Dark';
   document.getElementById('btnDarkFs').textContent = d ? 'Light' : 'Dark';
+  saveState();
 }
 
 function buildFsSelect() {
@@ -1067,6 +1102,19 @@ function openSingle(idx) {
 
 const hiddenIcons = new Set(); // icons removed with -
 
+function rateSet(id, action) {
+  if (action === 'plus') {
+    hiddenSets.delete(id);
+    if (likedSets.has(id)) likedSets.delete(id);
+    else likedSets.add(id);
+  } else {
+    if (likedSets.has(id)) likedSets.delete(id);
+    else hiddenSets.add(id);
+  }
+  renderSidebar();
+  saveState();
+}
+
 function rateIcon(iconId, action) {
   if (action === 'plus') {
     hiddenIcons.delete(iconId);
@@ -1075,9 +1123,10 @@ function rateIcon(iconId, action) {
   } else {
     // minus: if liked, remove from likes; otherwise hide from view
     if (likedIcons.has(iconId)) likedIcons.delete(iconId);
-    else { hiddenIcons.add(iconId); navSingle(1); return; }
+    else { hiddenIcons.add(iconId); saveState(); navSingle(1); return; }
   }
   renderCanvas();
+  saveState();
 }
 
 function selectVariant(fullIcon) {
@@ -1199,6 +1248,7 @@ document.addEventListener('mouseup', () => {
   resizeHandle.classList.remove('dragging');
   document.body.style.cursor = '';
   document.body.style.userSelect = '';
+  saveState();
 });
 
 // Pinch-to-zoom and scroll remapping on canvas
@@ -1216,6 +1266,48 @@ document.getElementById('canvas').addEventListener('wheel', e => {
   canvas.scrollLeft += e.deltaY + e.deltaX;
 }, { passive: false });
 
+// Persist state to localStorage
+const STORAGE_KEY = 'icon-sampler-state';
+
+function saveState() {
+  const state = {
+    scale: currentScale,
+    view: currentView,
+    sortMode,
+    activeFilter,
+    appMode,
+    dark: document.body.classList.contains('dark'),
+    liked: [...likedIcons],
+    hidden: [...hiddenIcons],
+    likedSets: [...likedSets],
+    hiddenSets: [...hiddenSets],
+    activeSet: activeSets.size === 1 ? [...activeSets][0] : null,
+    sidebarWidth: sidebar.style.width || null,
+  };
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+}
+
+function restoreState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (s.scale) { currentScale = s.scale; updateScale(); }
+    if (s.view) setView(s.view);
+    if (s.sortMode) setSortMode(s.sortMode);
+    if (s.activeFilter) toggleFilter(s.activeFilter);
+    if (s.appMode) setMode(s.appMode);
+    if (s.dark) toggleDark();
+    if (s.liked) s.liked.forEach(id => likedIcons.add(id));
+    if (s.hidden) s.hidden.forEach(id => hiddenIcons.add(id));
+    if (s.likedSets) s.likedSets.forEach(id => likedSets.add(id));
+    if (s.hiddenSets) s.hiddenSets.forEach(id => hiddenSets.add(id));
+    if (s.activeSet) { activeSets.clear(); activeSets.add(s.activeSet); }
+    if (s.sidebarWidth) sidebar.style.width = s.sidebarWidth;
+  } catch {}
+}
+
+restoreState();
 loadCollections();
 </script>
 </body>
