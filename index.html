@@ -1906,6 +1906,8 @@ document.getElementById('canvas').addEventListener('wheel', e => {
     }
     return;
   }
+  // When searching or in buttons grid, allow native vertical scroll
+  if (searchFilter || appMode === 'buttons') return;
   // Map vertical scroll to horizontal on canvas
   const canvas = document.getElementById('canvas');
   e.preventDefault();
