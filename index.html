@@ -3782,9 +3782,11 @@ function animPrev() {
 function animTogglePause() {
   animPaused = !animPaused;
   if (animPaused) {
+    // Stop auto-cycling, but keep current animation looping visually
     clearInterval(animCycleTimer);
     animCycleTimer = null;
   } else {
+    // Start auto-cycling through animations
     if (animIdx < 0) animIdx = 0;
     animSetByIndex(animIdx);
     restartAnimTimer();
