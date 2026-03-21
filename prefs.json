@@ -3,7 +3,7 @@
   "view": "single",
   "sortMode": "category",
   "activeFilter": null,
-  "appMode": "buttons",
+  "appMode": "icons",
   "dark": false,
   "liked": [],
   "hidden": [],
@@ -19,6 +19,6 @@
   "likedButtonCats": [],
   "hiddenButtonCats": [],
   "activeSet": "dashicons",
-  "activeButtonCat": 177,
+  "activeButtonCat": 65,
   "sidebarWidth": null
 }

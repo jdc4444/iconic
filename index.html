@@ -892,6 +892,7 @@ function renderFilterButtons(mode) {
   const el = document.getElementById('sidebarFilters');
   const filters = mode === 'icons'
     ? [
+        { id: null, label: 'All' },
         { id: 'color', label: 'Color' },
         { id: 'animated', label: 'Animated' },
         { id: 'stroke', label: 'Stroke' },
@@ -900,11 +901,12 @@ function renderFilterButtons(mode) {
         { id: 'liked', label: 'Liked' },
       ]
     : [
+        { id: null, label: 'All' },
         { id: 'dark', label: 'Dark BG' },
         { id: 'liked', label: 'Liked' },
       ];
   el.innerHTML = filters.map(f =>
-    `<button class="filter-btn${activeFilter === f.id ? ' active' : ''}" onclick="toggleFilter('${f.id}')">${f.label}</button>`
+    `<button class="filter-btn${activeFilter === f.id ? ' active' : ''}" onclick="toggleFilter(${f.id === null ? 'null' : "'" + f.id + "'"})">${f.label}</button>`
   ).join('');
 }
 
