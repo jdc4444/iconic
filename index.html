@@ -355,7 +355,6 @@
     from { opacity: 0; }
     to { opacity: 1; }
   }
-
   .icon-cell {
     display: flex;
     align-items: center;
@@ -369,7 +368,7 @@
   }
 
   .icon-cell.visible {
-    animation: icon-enter 0.4s ease-out forwards;
+    animation: icon-enter 0.7s ease forwards;
   }
 
   .icon-cell:hover { background: var(--hover); }
@@ -3648,7 +3647,7 @@ function animateIcons() {
   cells.forEach((cell) => {
     const top = cell.getBoundingClientRect().top;
     const row = Math.floor((top - firstTop) / (cellH + 1));
-    const delay = row * 30; // 30ms per row
+    const delay = row * 40; // 40ms per row, gentle cascade
     cell.style.animationDelay = delay + 'ms';
     cell.addEventListener('animationend', () => { cell.style.animationDelay = ''; }, { once: true });
     observer.observe(cell);
