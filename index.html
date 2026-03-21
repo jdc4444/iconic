@@ -860,8 +860,8 @@ async function loadCollections() {
     });
     SETS = sets;
     document.querySelector('title').textContent = `Icon Sampler — ${SETS.length} Sets`;
-    // Default to first set
-    if (SETS.length) activeSets.add(SETS[0].id);
+    // Default to All
+    if (SETS.length) activeSets.add('__all__');
     buildFsSelect();
     renderSidebar();
     await renderCanvas();
