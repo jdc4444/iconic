@@ -1025,17 +1025,17 @@ function getIndicesForCatName(name) {
 }
 
 function loadButtonCatGroup(name) {
-  showAll = false;
   const indices = getIndicesForCatName(name);
   const allMatch = indices.length > 0 && indices.every(i => activeButtonCats.has(i));
-  if (allMatch) {
-    activeButtonCats.clear();
-  } else {
-    activeButtonCats.clear();
-    indices.forEach(i => activeButtonCats.add(i));
-  }
+  if (allMatch) return; // already active
+  showAll = false;
+  activeButtonCats.clear();
+  indices.forEach(i => activeButtonCats.add(i));
   buttonSingleIndex = 0;
-  renderSidebar();
+  document.querySelectorAll('.set-item').forEach(el => {
+    const onclick = el.getAttribute('onclick') || '';
+    el.classList.toggle('active', onclick.includes(`'${name}'`));
+  });
   renderControls(appMode);
   renderCanvas();
   saveState();
@@ -1113,10 +1113,15 @@ function toggleFilter(type) {
 }
 
 async function loadSet(id) {
+  if (activeSets.size === 1 && activeSets.has(id)) return; // already active
   showAll = false;
   activeSets.clear();
   activeSets.add(id);
-  renderSidebar();
+  // Update active class without full re-render to prevent layout bounce
+  document.querySelectorAll('.set-item').forEach(el => {
+    const onclick = el.getAttribute('onclick') || '';
+    el.classList.toggle('active', onclick.includes(`'${id}'`));
+  });
   renderControls(appMode);
   await renderCanvas();
   syncFsSelect();
@@ -3167,15 +3172,15 @@ function renderLoadingSidebar(el) {
 }
 
 function loadLoadingCat(idx) {
+  if (activeLoadingCats.size === 1 && activeLoadingCats.has(idx)) return; // already active
   showAll = false;
-  if (activeLoadingCats.size === 1 && activeLoadingCats.has(idx)) {
-    activeLoadingCats.clear();
-  } else {
-    activeLoadingCats.clear();
-    activeLoadingCats.add(idx);
-  }
+  activeLoadingCats.clear();
+  activeLoadingCats.add(idx);
   loadingSingleIndex = 0;
-  renderSidebar();
+  document.querySelectorAll('.set-item').forEach(el => {
+    const onclick = el.getAttribute('onclick') || '';
+    el.classList.toggle('active', onclick.includes(`(${idx})`));
+  });
   renderCanvas();
   saveState();
 }

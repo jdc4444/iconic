@@ -33,7 +33,7 @@
   "hiddenLoadingCatsList": [
     11
   ],
-  "activeSet": null,
+  "activeSet": "dashicons",
   "activeButtonCat": null,
   "activeLoadingCat": null,
   "animIdx": 2,
