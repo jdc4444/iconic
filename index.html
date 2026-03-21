@@ -1638,12 +1638,29 @@ document.addEventListener('mouseup', () => {
 });
 
 // Pinch-to-zoom and scroll remapping on canvas
+let singleScrollAccum = 0;
+let singleScrollTimer = null;
 document.getElementById('canvas').addEventListener('wheel', e => {
   if (e.ctrlKey) {
     e.preventDefault();
     const factor = 1 - e.deltaY * 0.01;
     currentScale = Math.round(Math.min(512, Math.max(12, currentScale * factor)));
     updateScale();
+    return;
+  }
+  // In single/versions view, scroll navigates between icons
+  if (currentView === 'single' || currentView === 'versions') {
+    e.preventDefault();
+    singleScrollAccum += e.deltaY + e.deltaX;
+    if (!singleScrollTimer) {
+      singleScrollTimer = setTimeout(() => {
+        if (Math.abs(singleScrollAccum) > 30) {
+          navSingle(singleScrollAccum > 0 ? 1 : -1);
+        }
+        singleScrollAccum = 0;
+        singleScrollTimer = null;
+      }, 80);
+    }
     return;
   }
   // Map vertical scroll to horizontal on canvas
