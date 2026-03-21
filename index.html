@@ -293,7 +293,7 @@
     border-color: var(--fg);
   }
 
-  .view-toggle { margin-left: auto; display: flex; gap: 0; }
+  .view-toggle { display: flex; gap: 0; }
 
   .view-toggle button {
     padding: 4px 10px;
@@ -705,20 +705,20 @@
       <input type="range" class="scale-slider" id="scaleSlider" min="12" max="512" value="100">
       <span class="scale-value" id="scaleValue">100px</span>
       <div class="scale-presets">
-        <button onclick="setScale(16)">16</button>
         <button onclick="setScale(24)">24</button>
         <button onclick="setScale(48)">48</button>
         <button onclick="setScale(96)">96</button>
-        <button onclick="setScale(128)">128</button>
         <button onclick="setScale(256)">256</button>
-        <button onclick="setScale(512)">512</button>
+      </div>
+      <div class="view-toggle" style="margin-left:auto">
+        <button class="active" id="tbAll" onclick="toggleFilter(null)">All</button>
+        <button id="tbLiked" onclick="toggleFilter('liked')">Liked</button>
       </div>
       <div class="view-toggle">
         <button class="active" onclick="setView('grid')" id="btnGrid">Grid</button>
         <button onclick="setView('single')" id="btnSingle">Single</button>
         <button onclick="setView('versions')" id="btnVersions">Versions</button>
       </div>
-      <button class="tb-btn" onclick="toggleFullscreen()">Fullscreen</button>
       <button class="tb-btn" onclick="toggleDark()" id="btnDark">Dark</button>
     </div>
     <div class="canvas" id="canvas">
@@ -947,18 +947,20 @@ function renderControls(mode) {
     ? [{ id: 'dark', label: 'Dark' }]
     : [{ id: 'dark', label: 'Dark' }];
 
-  const isAll = activeFilter === null;
   const isName = sortMode === 'name';
-  const isCat = sortMode === 'category' && activeFilter !== 'liked';
-  const isLiked = activeFilter === 'liked';
+  const isCat = sortMode === 'category';
 
-  let html = `<button class="sort-btn${isAll && !isLiked ? ' active' : ''}" onclick="toggleFilter(null);setSortMode('category')">All</button>`;
-  html += `<button class="sort-btn${isName && !isLiked ? ' active' : ''}" onclick="setSortMode('name');toggleFilter(null)">Name</button>`;
-  html += `<button class="sort-btn${isCat && !isAll && !isLiked ? ' active' : ''}" onclick="setSortMode('category');toggleFilter(null)">Category</button>`;
-  html += `<button class="sort-btn${isLiked ? ' active' : ''}" onclick="toggleFilter('liked')">Liked</button>`;
+  let html = `<button class="sort-btn${isName ? ' active' : ''}" onclick="setSortMode('name')">Name</button>`;
+  html += `<button class="sort-btn${isCat ? ' active' : ''}" onclick="setSortMode('category')">Category</button>`;
   for (const f of modeFilters) {
     html += `<button class="sort-btn${activeFilter === f.id ? ' active' : ''}" onclick="toggleFilter('${f.id}')">${f.label}</button>`;
   }
+
+  // Update topbar All/Liked island
+  const tbAll = document.getElementById('tbAll');
+  const tbLiked = document.getElementById('tbLiked');
+  if (tbAll) tbAll.classList.toggle('active', activeFilter === null);
+  if (tbLiked) tbLiked.classList.toggle('active', activeFilter === 'liked');
   el.innerHTML = html;
 }
 
