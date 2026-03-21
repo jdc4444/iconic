@@ -650,7 +650,14 @@ function setSortMode(mode) {
 function renderSidebar() {
   const el = document.getElementById('setList');
   let filtered = searchFilter
-    ? SETS.filter(s => s.name.toLowerCase().includes(searchFilter) || s.author.toLowerCase().includes(searchFilter) || s.tier.toLowerCase().includes(searchFilter))
+    ? SETS.filter(s => {
+        if (s.name.toLowerCase().includes(searchFilter) || s.author.toLowerCase().includes(searchFilter) || s.tier.toLowerCase().includes(searchFilter)) return true;
+        // Also match if any cached icon name contains the search term
+        const cached = iconCache[s.prefix];
+        if (cached) return cached.some(name => name.toLowerCase().includes(searchFilter));
+        // Check sample icons as fallback
+        return s.sample.some(name => name.toLowerCase().includes(searchFilter));
+      })
     : [...SETS];
 
   if (sortMode === 'name') {
