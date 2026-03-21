@@ -4218,10 +4218,15 @@ function applyState(s) {
   if (s.hidden) s.hidden.forEach(id => hiddenIcons.add(id));
   if (s.likedSets) { likedSets.clear(); s.likedSets.forEach(id => likedSets.add(id)); }
   if (s.hiddenSets) s.hiddenSets.forEach(id => hiddenSets.add(id));
-  if (s.likedButtons) s.likedButtons.forEach(id => likedButtons.add(id));
-  if (s.hiddenButtons) s.hiddenButtons.forEach(id => hiddenButtonItems.add(id));
-  if (s.likedButtonCats) s.likedButtonCats.forEach(id => likedButtonCats.add(id));
-  if (s.hiddenButtonCats) s.hiddenButtonCats.forEach(id => hiddenButtonCats.add(id));
+  // Validate button indices against current (post-dedup) catalog
+  const validBtnId = id => {
+    const [ci, bi] = id.split(':').map(Number);
+    return BUTTON_CATALOG[ci] && BUTTON_CATALOG[ci].buttons[bi];
+  };
+  if (s.likedButtons) s.likedButtons.filter(validBtnId).forEach(id => likedButtons.add(id));
+  if (s.hiddenButtons) s.hiddenButtons.filter(validBtnId).forEach(id => hiddenButtonItems.add(id));
+  if (s.likedButtonCats) s.likedButtonCats.filter(i => BUTTON_CATALOG[i]).forEach(id => likedButtonCats.add(id));
+  if (s.hiddenButtonCats) s.hiddenButtonCats.filter(i => BUTTON_CATALOG[i]).forEach(id => hiddenButtonCats.add(id));
   if (s.likedLoadingItems) s.likedLoadingItems.forEach(id => likedLoading.add(id));
   if (s.hiddenLoadingItems) s.hiddenLoadingItems.forEach(id => hiddenLoadingItems.add(id));
   if (s.likedLoadingCats) s.likedLoadingCats.forEach(id => likedLoadingCats.add(id));

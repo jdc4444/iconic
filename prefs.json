@@ -22,7 +22,9 @@
     "mdi",
     "heroicons"
   ],
-  "hiddenSets": [],
+  "hiddenSets": [
+    "academicons"
+  ],
   "likedButtons": [],
   "hiddenButtons": [
     "158:0",
@@ -30,21 +32,33 @@
     "136:1",
     "136:0",
     "145:0",
-    "121:5",
     "113:9",
-    "114:9",
     "114:8",
     "92:6"
   ],
   "likedButtonCats": [],
-  "hiddenButtonCats": [],
+  "hiddenButtonCats": [
+    107,
+    108,
+    109,
+    110,
+    152,
+    33,
+    159,
+    100,
+    34,
+    35,
+    36,
+    153,
+    158
+  ],
   "likedLoadingItems": [],
   "hiddenLoadingItems": [],
   "likedLoadingCats": [],
   "hiddenLoadingCatsList": [
     11
   ],
-  "activeSet": "__all__",
+  "activeSet": "gg",
   "activeButtonCat": null,
   "activeLoadingCat": null,
   "animIdx": 1,
