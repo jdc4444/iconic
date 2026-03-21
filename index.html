@@ -497,6 +497,33 @@
     font-size: 12px;
   }
 
+  .sidebar-filters {
+    display: flex;
+    gap: 4px;
+    padding: 6px 12px 0;
+  }
+
+  .filter-btn {
+    padding: 4px 10px;
+    font-size: 10px;
+    font-family: inherit;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .filter-btn:hover { color: var(--fg); border-color: var(--fg); }
+
+  .filter-btn.active {
+    background: var(--fg);
+    color: var(--bg);
+    border-color: var(--fg);
+  }
+
   .keyboard-hint {
     padding: 6px 12px;
     font-size: 9px;
@@ -530,6 +557,10 @@
     <div class="set-list" id="setList"></div>
     <div class="sidebar-search">
       <input type="text" id="searchInput" placeholder="Search sets..." oninput="filterSets(this.value)">
+    </div>
+    <div class="sidebar-filters">
+      <button class="filter-btn" id="filterColor" onclick="toggleFilter('color')">Color</button>
+      <button class="filter-btn" id="filterAnimated" onclick="toggleFilter('animated')">Animated</button>
     </div>
     <div class="keyboard-hint">
       <kbd>↑</kbd><kbd>↓</kbd> Sets <kbd>←</kbd><kbd>→</kbd> Icons <kbd>Space</kbd> Versions <kbd>F</kbd> Full <kbd>D</kbd> Dark <kbd>Esc</kbd> Exit
@@ -593,6 +624,7 @@ let allVisibleIcons = [];
 let searchFilter = '';
 let sortMode = 'category'; // 'category' or 'name'
 let selectedVariant = null; // specific variant in single view
+let activeFilter = null; // null, 'color', or 'animated'
 const iconCache = {}; // prefix -> [icon names]
 
 async function loadCollections() {
@@ -616,6 +648,8 @@ async function loadCollections() {
         author: info.author?.name || '',
         license: info.license?.spdx || info.license?.title || '',
         sample: info.samples || [],
+        palette: !!info.palette,
+        animated: !!(info.tags && info.tags.includes('Contains Animations')),
       });
     }
     // Sort by category then name
@@ -660,6 +694,10 @@ function renderSidebar() {
       })
     : [...SETS];
 
+  // Apply type filter
+  if (activeFilter === 'color') filtered = filtered.filter(s => s.palette);
+  if (activeFilter === 'animated') filtered = filtered.filter(s => s.animated);
+
   if (sortMode === 'name') {
     filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
   }
@@ -683,6 +721,13 @@ function renderSidebar() {
 
 function filterSets(q) {
   searchFilter = q.toLowerCase();
+  renderSidebar();
+}
+
+function toggleFilter(type) {
+  activeFilter = activeFilter === type ? null : type;
+  document.getElementById('filterColor').classList.toggle('active', activeFilter === 'color');
+  document.getElementById('filterAnimated').classList.toggle('active', activeFilter === 'animated');
   renderSidebar();
 }
 
