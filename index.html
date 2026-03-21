@@ -680,7 +680,7 @@
   @keyframes anim-pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.06); } }
   @keyframes anim-spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
   @keyframes anim-bounce { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-4px); } }
-  @keyframes anim-shimmer { 0% { filter:brightness(1); } 50% { filter:brightness(1.3); } 100% { filter:brightness(1); } }
+  @keyframes anim-shimmer { 0%,100% { filter:drop-shadow(0 0 0 transparent); } 50% { filter:drop-shadow(0 0 8px currentColor) drop-shadow(0 0 2px currentColor); } }
   @keyframes anim-glow { 0%,100% { filter:drop-shadow(0 0 2px currentColor); } 50% { filter:drop-shadow(0 0 8px currentColor); } }
   @keyframes anim-fade { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
   @keyframes anim-shake { 0%,100% { transform:translateX(0); } 20% { transform:translateX(-2px); } 40% { transform:translateX(2px); } 60% { transform:translateX(-1px); } 80% { transform:translateX(1px); } }
@@ -3307,8 +3307,8 @@ function navLoadingCat(dir) {
 async function renderCanvas() {
   const canvas = document.getElementById('canvas');
 
-  if (appMode === 'buttons') return renderButtonCanvas();
-  if (appMode === 'loading') return renderLoadingCanvas();
+  if (appMode === 'buttons') { renderButtonCanvas(); applyAnim(); return; }
+  if (appMode === 'loading') { renderLoadingCanvas(); applyAnim(); return; }
 
   // Search results scroll vertically; normal view scrolls horizontally
   if (searchFilter) {
@@ -3422,8 +3422,9 @@ async function renderCanvas() {
     return;
   }
 
-  if (currentView === 'single' || currentView === 'versions') return renderSingleView(canvas, displaySets);
+  if (currentView === 'single' || currentView === 'versions') { renderSingleView(canvas, displaySets); applyAnim(); return; }
   renderIconGrid(canvas, displaySets);
+  applyAnim();
 }
 
 function buildSetHtml(s, gridStyle, cellSize) {
