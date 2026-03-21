@@ -5,7 +5,10 @@
   "activeFilter": null,
   "appMode": "icons",
   "dark": false,
-  "liked": [],
+  "liked": [
+    "openmoji:person-walking-dark-skin-tone-facing-right",
+    "openmoji:man-walking-medium-dark-skin-tone-facing-right"
+  ],
   "hidden": [],
   "likedSets": [
     "mdi",
@@ -33,13 +36,15 @@
   "hiddenLoadingCatsList": [
     11
   ],
-  "activeSet": null,
+  "activeSet": "openmoji",
   "activeButtonCat": null,
   "activeLoadingCat": null,
-  "animIdx": 2,
+  "animIdx": 1,
   "likedAnims": [],
   "hiddenAnims": [
-    "anim-glow"
+    "anim-glow",
+    "anim-shimmer",
+    "anim-shake"
   ],
   "sidebarWidth": null
 }

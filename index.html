@@ -3403,6 +3403,11 @@ async function renderCanvas() {
     displaySets = SETS.filter(s => activeSets.has(s.id));
   }
 
+  // Apply same sort as sidebar
+  if (sortMode === 'name') {
+    displaySets = [...displaySets].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   if (!displaySets.length) {
     canvas.innerHTML = '<div class="empty-state">Select an icon set to begin</div>';
     return;
@@ -3436,11 +3441,15 @@ async function renderCanvas() {
     renderIconGrid(canvas, readySets);
     if (uncached.length) {
       const currentFilter = activeFilter;
-      for (const s of uncached) {
-        await fetchIcons(s.prefix);
+      const BATCH = 8;
+      for (let i = 0; i < uncached.length; i += BATCH) {
+        const batch = uncached.slice(i, i + BATCH);
+        await Promise.all(batch.map(s => fetchIcons(s.prefix)));
         if (activeFilter !== currentFilter || !activeSets.has('__all__')) return;
-        const icons = getIcons(s);
-        if (icons.length > 0) appendSetToCanvas(canvas, s);
+        for (const s of batch) {
+          const icons = getIcons(s);
+          if (icons.length > 0) appendSetToCanvas(canvas, s);
+        }
       }
     }
     return;
@@ -3476,14 +3485,21 @@ async function renderCanvas() {
   applyAnim();
 }
 
-function buildSetHtml(s, gridStyle, cellSize) {
-  const names = getIcons(s);
-  if (!names.length) return { html: '', icons: [] };
+const ALL_MODE_ICON_CAP = 24; // max icons per set in All mode grid
+
+function buildSetHtml(s, gridStyle, cellSize, cap = 0) {
+  const allNames = getIcons(s);
+  if (!allNames.length) return { html: '', icons: [] };
+  const capped = cap > 0 && allNames.length > cap;
+  const names = capped ? allNames.slice(0, cap) : allNames;
   const icons = names.map(n => ({ icon: `${s.prefix}:${n}`, set: s.name, prefix: s.prefix }));
+  const moreBtn = capped
+    ? `<div style="padding:4px 8px;font-size:11px;color:var(--muted);cursor:pointer" onclick="loadSet('${s.id}')">${allNames.length - cap} more →</div>`
+    : '';
   const html = `<div class="set-section" data-prefix="${s.prefix}">
     <div class="set-section-header">
       <span class="set-section-title">${s.name}</span>
-      <span class="set-section-count">${icons.length.toLocaleString()} icons · ${s.license}</span>
+      <span class="set-section-count">${allNames.length.toLocaleString()} icons · ${s.license}</span>
       <span class="set-section-author">${s.author}</span>
     </div>
     <div class="icon-grid" style="${gridStyle}">${icons.map(ic => {
@@ -3496,21 +3512,57 @@ function buildSetHtml(s, gridStyle, cellSize) {
         <iconify-icon icon="${ic.icon}" width="${currentScale}" height="${currentScale}"></iconify-icon>
         <div class="tooltip">${ic.icon}</div>
       </div>`;
-    }).join('')}</div>
+    }).join('')}${moreBtn}</div>
   </div>`;
   return { html, icons };
 }
 
 function renderIconGrid(canvas, sets) {
   const cellSize = Math.max(currentScale + 8, 28);
-  const gridStyle = searchFilter
+  const isAllOrSearch = activeSets.has('__all__') || !!searchFilter;
+  const gridStyle = isAllOrSearch
     ? 'flex-direction:row;align-content:flex-start;max-height:none'
     : '';
+  const cap = isAllOrSearch ? ALL_MODE_ICON_CAP : 0;
 
   allVisibleIcons = [];
+
+  // For All/search mode with many sets, use lazy rendering
+  if (isAllOrSearch && sets.length > 10) {
+    canvas.innerHTML = '';
+    // Create placeholder divs, render on scroll into view
+    const lazyObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const el = entry.target;
+          const idx = parseInt(el.dataset.lazyIdx);
+          const s = sets[idx];
+          if (!s) return;
+          const { html, icons } = buildSetHtml(s, gridStyle, cellSize, cap);
+          if (html) {
+            el.innerHTML = html;
+            el.querySelector('.icon-grid')?.querySelectorAll('.icon-cell').forEach(cell => cell.classList.add('visible'));
+            icons.forEach(ic => allVisibleIcons.push(ic));
+            rebindIconClicks(el);
+          }
+          lazyObserver.unobserve(el);
+        }
+      });
+    }, { rootMargin: '600px' });
+
+    for (let i = 0; i < sets.length; i++) {
+      const placeholder = document.createElement('div');
+      placeholder.dataset.lazyIdx = i;
+      placeholder.style.minHeight = '80px'; // reserve space
+      canvas.appendChild(placeholder);
+      lazyObserver.observe(placeholder);
+    }
+    return;
+  }
+
   const parts = [];
   for (const s of sets) {
-    const { html, icons } = buildSetHtml(s, gridStyle, cellSize);
+    const { html, icons } = buildSetHtml(s, gridStyle, cellSize, cap);
     if (html) {
       parts.push(html);
       icons.forEach(ic => allVisibleIcons.push(ic));
@@ -3524,7 +3576,9 @@ function renderIconGrid(canvas, sets) {
 function appendSetToCanvas(canvas, s) {
   const cellSize = Math.max(currentScale + 8, 28);
   const gridStyle = 'flex-direction:row;align-content:flex-start;max-height:none';
-  const { html, icons } = buildSetHtml(s, gridStyle, cellSize);
+  const isAllOrSearch = activeSets.has('__all__') || !!searchFilter;
+  const cap = isAllOrSearch ? ALL_MODE_ICON_CAP : 0;
+  const { html, icons } = buildSetHtml(s, gridStyle, cellSize, cap);
   if (!html) return;
   icons.forEach(ic => allVisibleIcons.push(ic));
   canvas.insertAdjacentHTML('beforeend', html);
@@ -3532,9 +3586,9 @@ function appendSetToCanvas(canvas, s) {
   animateIcons();
 }
 
-function rebindIconClicks() {
+function rebindIconClicks(root) {
   // Re-bind click handlers based on current allVisibleIcons order
-  document.querySelectorAll('.icon-cell[data-icon]').forEach(cell => {
+  (root || document).querySelectorAll('.icon-cell[data-icon]').forEach(cell => {
     const icon = cell.dataset.icon;
     const idx = allVisibleIcons.findIndex(ic => ic.icon === icon);
     if (idx !== -1) cell.onclick = () => openSingle(idx);
