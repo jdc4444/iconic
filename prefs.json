@@ -1,0 +1,20 @@
+{
+  "scale": 100,
+  "view": "grid",
+  "sortMode": "category",
+  "activeFilter": null,
+  "appMode": "buttons",
+  "dark": false,
+  "liked": [],
+  "hidden": [],
+  "likedSets": [
+    "lucide",
+    "lucide-lab",
+    "mdi",
+    "heroicons"
+  ],
+  "hiddenSets": [],
+  "activeSet": "dashicons",
+  "activeButtonCat": 19,
+  "sidebarWidth": null
+}
