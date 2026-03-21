@@ -839,6 +839,7 @@ function renderSidebar() {
 function filterSets(q) {
   searchFilter = q.toLowerCase();
   renderSidebar();
+  renderCanvas();
 }
 
 function toggleFilter(type) {
@@ -963,7 +964,11 @@ async function fetchIcons(prefix) {
 }
 
 function getIcons(s) {
-  return iconCache[s.prefix] || s.sample;
+  const icons = iconCache[s.prefix] || s.sample;
+  if (searchFilter) {
+    return icons.filter(name => name.toLowerCase().includes(searchFilter));
+  }
+  return icons;
 }
 
 // 200+ visually distinct button styles using inline styles
