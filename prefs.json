@@ -1,9 +1,9 @@
 {
   "scale": 58,
-  "view": "grid",
+  "view": "single",
   "sortMode": "category",
   "activeFilter": null,
-  "appMode": "buttons",
+  "appMode": "icons",
   "dark": false,
   "liked": [],
   "hidden": [],
@@ -20,7 +20,12 @@
     "158:1",
     "136:1",
     "136:0",
-    "145:0"
+    "145:0",
+    "121:5",
+    "113:9",
+    "114:9",
+    "114:8",
+    "92:6"
   ],
   "likedButtonCats": [],
   "hiddenButtonCats": [
@@ -88,7 +93,7 @@
   "hiddenLoadingCatsList": [
     11
   ],
-  "activeSet": "dashicons",
+  "activeSet": "whh",
   "activeButtonCat": null,
   "activeLoadingCat": null,
   "sidebarWidth": null
