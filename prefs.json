@@ -58,7 +58,7 @@
   "hiddenLoadingCatsList": [
     11
   ],
-  "activeSet": null,
+  "activeSet": "__all__",
   "activeButtonCat": null,
   "activeLoadingCat": null,
   "animIdx": 1,

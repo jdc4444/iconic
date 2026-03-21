@@ -922,7 +922,7 @@ function renderSidebar() {
   else if (activeFilter === 'logos') filtered = filtered.filter(s => s.tier === 'Logos');
   else if (activeFilter === 'flags') filtered = filtered.filter(s => s.tier === 'Flags / Maps');
   else if (activeFilter === 'material') filtered = filtered.filter(s => s.tier === 'Material');
-  else if (activeFilter === 'liked') filtered = filtered.filter(s => likedSets.has(s.id));
+  else if (activeFilter === 'liked') filtered = filtered.filter(s => likedSets.has(s.id) || [...likedIcons].some(ic => ic.startsWith(s.prefix + ':')));
   // Hide sets removed with -
   filtered = filtered.filter(s => !hiddenSets.has(s.id));
 
@@ -1255,10 +1255,15 @@ async function fetchIcons(prefix) {
 
 function getIcons(s) {
   const icons = iconCache[s.prefix] || s.sample;
+  let result = icons;
   if (searchFilter) {
-    return icons.filter(name => searchMatch(name.toLowerCase(), searchFilter));
+    result = result.filter(name => searchMatch(name.toLowerCase(), searchFilter));
   }
-  return icons;
+  // When liked filter active and set isn't a fully-liked set, only show liked icons
+  if (activeFilter === 'liked' && !likedSets.has(s.id)) {
+    result = result.filter(name => likedIcons.has(s.prefix + ':' + name));
+  }
+  return result;
 }
 
 // 200+ visually distinct button styles using inline styles
@@ -3410,23 +3415,55 @@ async function renderCanvas() {
   // When not searching, show only the active/selected set(s)
   let displaySets;
   if (searchFilter) {
-    // Show sets that have matching icons (from sidebar's filtered list)
-    displaySets = SETS.filter(s => {
+    // Filter eligible sets by type filter
+    const eligible = SETS.filter(s => {
       if (hiddenSets.has(s.id)) return false;
-      // Apply type filter
       if (activeFilter === 'color' && !s.palette) return false;
       if (activeFilter === 'animated' && !s.animated) return false;
       if (activeFilter === 'stroke' && !s.stroke) return false;
       if (activeFilter === 'emoji' && s.tier !== 'Emoji') return false;
       if (activeFilter === 'logos' && s.tier !== 'Logos') return false;
       if (activeFilter === 'material' && s.tier !== 'Material') return false;
-      if (activeFilter === 'liked' && !likedSets.has(s.id)) return false;
-      // Check if set name/author matches OR if cached icons match
+      if (activeFilter === 'liked' && !likedSets.has(s.id) && ![...likedIcons].some(ic => ic.startsWith(s.prefix + ':'))) return false;
+      return true;
+    });
+    // Immediately show sets with cached matches or name/author matches
+    const cachedMatches = eligible.filter(s => {
       if (searchMatch(s.name.toLowerCase(), searchFilter) || searchMatch(s.author.toLowerCase(), searchFilter)) return true;
-      const cached = iconCache[s.prefix];
-      if (cached) return cached.some(name => searchMatch(name.toLowerCase(), searchFilter));
+      const c = iconCache[s.prefix];
+      if (c) return c.some(name => searchMatch(name.toLowerCase(), searchFilter));
       return s.sample.some(name => searchMatch(name.toLowerCase(), searchFilter));
     });
+    displaySets = cachedMatches;
+    // Progressively fetch uncached sets and add matches
+    const uncachedEligible = eligible.filter(s => !iconCache[s.prefix] && !cachedMatches.includes(s));
+    if (uncachedEligible.length > 0) {
+      const savedFilter = searchFilter;
+      const savedExact = searchExact;
+      // Render what we have first, then stream in rest
+      if (cachedMatches.length) {
+        renderIconGrid(canvas, cachedMatches);
+      } else {
+        canvas.innerHTML = '<div class="empty-state">Searching all icon sets...</div>';
+      }
+      const BATCH = 10;
+      for (let i = 0; i < uncachedEligible.length; i += BATCH) {
+        const batch = uncachedEligible.slice(i, i + BATCH);
+        await Promise.all(batch.map(s => fetchIcons(s.prefix)));
+        if (searchFilter !== savedFilter || searchExact !== savedExact) return; // search changed, bail
+        for (const s of batch) {
+          const icons = getIcons(s);
+          if (icons.length > 0) {
+            cachedMatches.push(s);
+            appendSetToCanvas(canvas, s);
+          }
+        }
+        // Update sidebar with new matches
+        renderSidebar();
+      }
+      applyAnim();
+      return;
+    }
   } else if (activeSets.has('__all__')) {
     // "All" mode: show all non-hidden sets, load progressively
     displaySets = SETS.filter(s => !hiddenSets.has(s.id));
@@ -3434,7 +3471,7 @@ async function renderCanvas() {
     if (activeFilter === 'color') displaySets = displaySets.filter(s => s.palette);
     else if (activeFilter === 'animated') displaySets = displaySets.filter(s => s.animated);
     else if (activeFilter === 'stroke') displaySets = displaySets.filter(s => s.stroke);
-    else if (activeFilter === 'liked') displaySets = displaySets.filter(s => likedSets.has(s.id));
+    else if (activeFilter === 'liked') displaySets = displaySets.filter(s => likedSets.has(s.id) || [...likedIcons].some(ic => ic.startsWith(s.prefix + ':')));
   } else {
     displaySets = SETS.filter(s => activeSets.has(s.id));
   }
