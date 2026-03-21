@@ -3,7 +3,7 @@
   "view": "grid",
   "sortMode": "category",
   "activeFilter": "material",
-  "appMode": "loading",
+  "appMode": "icons",
   "dark": false,
   "liked": [],
   "hidden": [],

@@ -147,6 +147,9 @@
 
   .sidebar-search input:focus { border-color: var(--fg); }
   .sidebar-search input::placeholder { color: var(--muted); }
+  .search-filters { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+  .search-filters:empty { display: none; }
+  .search-filters .sort-btn { font-size: 10px; padding: 3px 8px; }
 
   .set-list { flex: 1; overflow-y: auto; padding: 4px 0; }
   .set-list::-webkit-scrollbar { width: 4px; }
@@ -719,6 +722,7 @@
     <div class="set-list" id="setList"></div>
     <div class="sidebar-search">
       <input type="text" id="searchInput" placeholder="Search sets..." oninput="filterSets(this.value)">
+      <div id="searchFilters" class="search-filters"></div>
     </div>
     <div class="keyboard-hint">
       <kbd>↑</kbd><kbd>↓</kbd> Sets <kbd>←</kbd><kbd>→</kbd> Icons <kbd>Space</kbd> Versions <kbd>F</kbd> Full <kbd>D</kbd> Dark <kbd>Esc</kbd> Exit
@@ -994,8 +998,16 @@ function renderControls(mode) {
 
   let html = `<button class="sort-btn${isName ? ' active' : ''}" onclick="setSortMode('name')">Name</button>`;
   html += `<button class="sort-btn${isCat ? ' active' : ''}" onclick="setSortMode('category')">Category</button>`;
-  for (const f of modeFilters) {
-    html += `<button class="sort-btn${activeFilter === f.id ? ' active' : ''}" onclick="toggleFilter('${f.id}')">${f.label}</button>`;
+  el.innerHTML = html;
+
+  // Render mode-specific filters below search bar
+  const sf = document.getElementById('searchFilters');
+  if (sf) {
+    let fhtml = '';
+    for (const f of modeFilters) {
+      fhtml += `<button class="sort-btn${activeFilter === f.id ? ' active' : ''}" onclick="toggleFilter('${f.id}')">${f.label}</button>`;
+    }
+    sf.innerHTML = fhtml;
   }
 
   // Update topbar All/Liked island
@@ -1003,7 +1015,6 @@ function renderControls(mode) {
   const tbLiked = document.getElementById('tbLiked');
   if (tbAll) tbAll.classList.toggle('active', activeFilter === null);
   if (tbLiked) tbLiked.classList.toggle('active', activeFilter === 'liked');
-  el.innerHTML = html;
 }
 
 function getIndicesForCatName(name) {
