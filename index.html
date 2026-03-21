@@ -715,6 +715,8 @@ let sortMode = 'category'; // 'category' or 'name'
 let selectedVariant = null; // specific variant in single view
 let activeFilter = null; // null, 'color', or 'animated'
 let appMode = 'icons'; // 'icons' or 'buttons'
+let activeButtonCats = new Set(); // active button category indices
+let buttonSingleIndex = 0; // current button index in single view
 const likedIcons = new Set(); // stores liked icon identifiers (prefix:name)
 const likedSets = new Set(['lucide', 'lucide-lab']); // liked icon set prefixes
 const hiddenSets = new Set(); // hidden icon set prefixes
@@ -771,7 +773,9 @@ function setMode(mode) {
   appMode = mode;
   document.getElementById('modeIcons').classList.toggle('active', mode === 'icons');
   document.getElementById('modeButtons').classList.toggle('active', mode === 'buttons');
-  // TODO: switch sidebar content between icons and buttons
+  if (mode === 'buttons' && activeButtonCats.size === 0 && BUTTON_CATALOG.length) {
+    activeButtonCats.add(0);
+  }
   renderSidebar();
   renderCanvas();
   saveState();
@@ -787,6 +791,14 @@ function setSortMode(mode) {
 
 function renderSidebar() {
   const el = document.getElementById('setList');
+
+  if (appMode === 'buttons') return renderButtonSidebar(el);
+
+  // Restore icon-mode UI
+  document.getElementById('searchInput').placeholder = 'Search sets...';
+  document.querySelector('.sidebar-filters').style.display = '';
+  document.querySelector('.sidebar-sort').style.display = '';
+
   let filtered = searchFilter
     ? SETS.filter(s => {
         if (s.name.toLowerCase().includes(searchFilter) || s.author.toLowerCase().includes(searchFilter) || s.tier.toLowerCase().includes(searchFilter)) return true;
@@ -834,6 +846,34 @@ function renderSidebar() {
     </div>`;
   }
   el.innerHTML = html;
+}
+
+function renderButtonSidebar(el) {
+  let html = '';
+  BUTTON_CATALOG.forEach((cat, i) => {
+    if (searchFilter && !cat.category.toLowerCase().includes(searchFilter) &&
+        !cat.buttons.some(b => b.label.toLowerCase().includes(searchFilter))) return;
+    const active = activeButtonCats.has(i) ? ' active' : '';
+    html += `<div class="set-item${active}" onclick="loadButtonCat(${i})">
+      <div class="dot"></div>
+      <div class="set-info"><div class="set-name">${cat.category}</div></div>
+      <div class="set-count">${cat.buttons.length}</div>
+    </div>`;
+  });
+  el.innerHTML = html;
+  // Update search placeholder and hide icon-specific filters
+  document.getElementById('searchInput').placeholder = 'Search categories...';
+  document.querySelector('.sidebar-filters').style.display = 'none';
+  document.querySelector('.sidebar-sort').style.display = 'none';
+}
+
+function loadButtonCat(idx) {
+  activeButtonCats.clear();
+  activeButtonCats.add(idx);
+  buttonSingleIndex = 0;
+  renderSidebar();
+  renderCanvas();
+  saveState();
 }
 
 function filterSets(q) {
@@ -1274,32 +1314,142 @@ const BUTTON_CATALOG = [
   ]},
 ];
 
+function getActiveButtonCats() {
+  const cats = [];
+  for (const idx of activeButtonCats) {
+    if (BUTTON_CATALOG[idx]) cats.push({ idx, cat: BUTTON_CATALOG[idx] });
+  }
+  return cats;
+}
+
+function getAllVisibleButtons() {
+  const result = [];
+  const cats = getActiveButtonCats();
+  for (const { idx, cat } of cats) {
+    cat.buttons.forEach((b, bi) => {
+      if (searchFilter && !b.label.toLowerCase().includes(searchFilter) && !cat.category.toLowerCase().includes(searchFilter)) return;
+      result.push({ catIdx: idx, btnIdx: bi, btn: b, category: cat.category, dark: !!cat.dark });
+    });
+  }
+  return result;
+}
+
+function renderBtnHtml(b, size) {
+  const loadingAfter = b.extra === 'loading' ? ';position:relative' : '';
+  let inner = b.label;
+  if (b.extra === 'loading') {
+    inner += '<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;margin-left:8px;vertical-align:middle;animation:btn-spin 0.6s linear infinite"></span>';
+  }
+  const sizeStyle = size ? `;transform:scale(${size});transform-origin:center` : '';
+  return `<button class="demo-btn" style="${b.style}${loadingAfter}${sizeStyle}">${inner}</button>`;
+}
+
 function renderButtonCanvas() {
   const canvas = document.getElementById('canvas');
+  const allBtns = getAllVisibleButtons();
+
+  if (currentView === 'single' || currentView === 'versions') {
+    return renderButtonSingleView(canvas, allBtns);
+  }
+
+  // Grid view — show buttons from active categories
   canvas.style.overflowY = 'auto';
   canvas.style.overflowX = 'hidden';
   canvas.style.flexDirection = 'column';
+
+  if (!allBtns.length) {
+    canvas.innerHTML = '<div class="empty-state">Select a button category</div>';
+    return;
+  }
+
+  // Group by category
+  const groups = {};
+  for (const b of allBtns) {
+    if (!groups[b.catIdx]) groups[b.catIdx] = { category: b.category, dark: b.dark, buttons: [] };
+    groups[b.catIdx].buttons.push(b);
+  }
+
   let count = 0;
-  canvas.innerHTML = BUTTON_CATALOG.map(cat => {
-    const darkBg = cat.dark ? ' dark-bg' : '';
-    const html = `<div class="btn-cat-section">
-      <div class="btn-cat-header">${cat.category} <span style="font-weight:400;color:#aaa">${cat.buttons.length}</span></div>
-      <div class="btn-cat-grid${darkBg}">${cat.buttons.map(b => {
-        count++;
-        const loadingAfter = b.extra === 'loading'
-          ? ';position:relative' : '';
-        let inner = b.label;
-        if (b.extra === 'loading') {
-          inner += '<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;margin-left:8px;vertical-align:middle;animation:btn-spin 0.6s linear infinite"></span>';
-        }
-        return `<button class="demo-btn" style="${b.style}${loadingAfter}" title="${cat.category}: ${b.label}">${inner}</button>`;
+  canvas.innerHTML = Object.values(groups).map(g => {
+    const darkBg = g.dark ? ' dark-bg' : '';
+    count += g.buttons.length;
+    return `<div class="btn-cat-section">
+      <div class="btn-cat-header">${g.category} <span style="font-weight:400;color:#aaa">${g.buttons.length}</span></div>
+      <div class="btn-cat-grid${darkBg}">${g.buttons.map((b, i) => {
+        const globalIdx = allBtns.indexOf(b);
+        return `<div style="cursor:pointer" onclick="openButtonSingle(${globalIdx})">${renderBtnHtml(b.btn)}</div>`;
       }).join('')}</div>
     </div>`;
-    return html;
   }).join('');
-  // Show total count
   canvas.insertAdjacentHTML('afterbegin',
-    `<div style="font-size:12px;color:var(--muted);margin-bottom:16px">${count} button styles across ${BUTTON_CATALOG.length} categories</div>`);
+    `<div style="font-size:12px;color:var(--muted);margin-bottom:16px">${count} button styles across ${Object.keys(groups).length} categories</div>`);
+}
+
+function renderButtonSingleView(canvas, allBtns) {
+  canvas.style.overflowY = 'auto';
+  canvas.style.overflowX = 'hidden';
+  canvas.style.flexDirection = 'column';
+
+  if (!allBtns.length) {
+    canvas.innerHTML = '<div class="empty-state">No buttons to show</div>';
+    return;
+  }
+
+  if (buttonSingleIndex >= allBtns.length) buttonSingleIndex = 0;
+  if (buttonSingleIndex < 0) buttonSingleIndex = allBtns.length - 1;
+
+  const c = allBtns[buttonSingleIndex];
+
+  if (currentView === 'versions') {
+    // Show all buttons in this category as a grid
+    const catBtns = allBtns.filter(b => b.catIdx === c.catIdx);
+    canvas.innerHTML = `<div class="single-view">
+      <div class="single-set-name">${c.category}</div>
+      <div class="versions-grid" style="max-width:900px">${catBtns.map((b, i) => {
+        const globalIdx = allBtns.indexOf(b);
+        const isCurrent = globalIdx === buttonSingleIndex;
+        return `<div class="version-card${isCurrent ? ' current' : ''}" onclick="openButtonSingle(${globalIdx})" style="${isCurrent ? 'background:var(--hover)' : ''}">
+          ${renderBtnHtml(b.btn)}
+          <div class="version-label" title="${b.btn.label}">${b.btn.label}</div>
+        </div>`;
+      }).join('')}</div>
+      <div class="single-icon-name">${catBtns.length} style${catBtns.length !== 1 ? 's' : ''} in category</div>
+      <div class="single-nav">
+        <button onclick="navButtonSingle(-1)">&larr; Prev</button>
+        <span class="single-icon-name">${buttonSingleIndex + 1} / ${allBtns.length}</span>
+        <button onclick="navButtonSingle(1)">Next &rarr;</button>
+      </div>
+    </div>`;
+    return;
+  }
+
+  // Single view — show one button large with a dark/light backdrop as appropriate
+  const bgStyle = c.dark ? 'background:#1a1a2e;padding:60px;border-radius:16px' : '';
+  const scaleFactor = Math.max(currentScale / 48, 1.5); // scale button relative to slider
+  canvas.innerHTML = `<div class="single-view">
+    <div class="single-set-name">${c.category}</div>
+    <div style="${bgStyle};display:flex;align-items:center;justify-content:center">
+      ${renderBtnHtml(c.btn, scaleFactor)}
+    </div>
+    <div class="single-icon-name" style="font-size:12px;margin-top:8px">${c.btn.label}</div>
+    <div style="font-size:10px;color:var(--muted);max-width:500px;word-break:break-all;text-align:center;margin-top:4px">${c.btn.style}</div>
+    <div class="single-nav" style="margin-top:16px">
+      <button onclick="navButtonSingle(-1)">&larr; Prev</button>
+      <span class="single-icon-name">${buttonSingleIndex + 1} / ${allBtns.length}</span>
+      <button onclick="navButtonSingle(1)">Next &rarr;</button>
+    </div>
+  </div>`;
+}
+
+function openButtonSingle(idx) {
+  buttonSingleIndex = idx;
+  currentView = 'single';
+  setView('single');
+}
+
+function navButtonSingle(dir) {
+  buttonSingleIndex += dir;
+  renderCanvas();
 }
 
 async function renderCanvas() {
@@ -1602,10 +1752,10 @@ document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (e.key === 'f' || e.key === 'F') toggleFullscreen();
   if (e.key === 'd' || e.key === 'D') toggleDark();
-  if (e.key === 'ArrowUp') { e.preventDefault(); navSet(-1); }
-  if (e.key === 'ArrowDown') { e.preventDefault(); navSet(1); }
-  if (e.key === 'ArrowLeft') { e.preventDefault(); navSingle(-1); }
-  if (e.key === 'ArrowRight') { e.preventDefault(); navSingle(1); }
+  if (e.key === 'ArrowUp') { e.preventDefault(); appMode === 'buttons' ? navButtonCat(-1) : navSet(-1); }
+  if (e.key === 'ArrowDown') { e.preventDefault(); appMode === 'buttons' ? navButtonCat(1) : navSet(1); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); appMode === 'buttons' ? navButtonSingle(-1) : navSingle(-1); }
+  if (e.key === 'ArrowRight') { e.preventDefault(); appMode === 'buttons' ? navButtonSingle(1) : navSingle(1); }
   if (e.key === ' ') {
     e.preventDefault();
     if (currentView === 'grid') setView('single');
@@ -1613,6 +1763,19 @@ document.addEventListener('keydown', e => {
     else if (currentView === 'versions') setView('grid');
   }
 });
+
+function navButtonCat(dir) {
+  const cats = BUTTON_CATALOG.map((_, i) => i);
+  if (!cats.length) return;
+  const currentIdx = activeButtonCats.size === 1 ? [...activeButtonCats][0] : -1;
+  let idx = cats.indexOf(currentIdx);
+  idx += dir;
+  if (idx < 0) idx = cats.length - 1;
+  if (idx >= cats.length) idx = 0;
+  loadButtonCat(cats[idx]);
+  const el = document.querySelector('.set-item.active');
+  if (el) el.scrollIntoView({ block: 'nearest' });
+}
 
 // Resize handle
 const resizeHandle = document.getElementById('resizeHandle');
@@ -1653,14 +1816,15 @@ document.getElementById('canvas').addEventListener('wheel', e => {
     updateScale();
     return;
   }
-  // In single/versions view, scroll navigates between icons
+  // In single/versions view, scroll navigates between icons/buttons
   if (currentView === 'single' || currentView === 'versions') {
     e.preventDefault();
     singleScrollAccum += e.deltaY + e.deltaX;
     if (!singleScrollTimer) {
       singleScrollTimer = setTimeout(() => {
         if (Math.abs(singleScrollAccum) > 30) {
-          navSingle(singleScrollAccum > 0 ? 1 : -1);
+          const d = singleScrollAccum > 0 ? 1 : -1;
+          appMode === 'buttons' ? navButtonSingle(d) : navSingle(d);
         }
         singleScrollAccum = 0;
         singleScrollTimer = null;
@@ -1690,6 +1854,7 @@ function saveState() {
     likedSets: [...likedSets],
     hiddenSets: [...hiddenSets],
     activeSet: activeSets.size === 1 ? [...activeSets][0] : null,
+    activeButtonCat: activeButtonCats.size === 1 ? [...activeButtonCats][0] : null,
     sidebarWidth: sidebar.style.width || null,
   };
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
@@ -1711,6 +1876,7 @@ function restoreState() {
     if (s.likedSets) s.likedSets.forEach(id => likedSets.add(id));
     if (s.hiddenSets) s.hiddenSets.forEach(id => hiddenSets.add(id));
     if (s.activeSet) { activeSets.clear(); activeSets.add(s.activeSet); }
+    if (s.activeButtonCat != null) { activeButtonCats.clear(); activeButtonCats.add(s.activeButtonCat); }
     if (s.sidebarWidth) sidebar.style.width = s.sidebarWidth;
   } catch {}
 }
