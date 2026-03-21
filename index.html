@@ -396,11 +396,12 @@
     min-height: 100%;
     gap: 24px;
     text-align: center;
+    position: relative;
   }
 
   .single-icon-display iconify-icon { display: block; }
 
-  .single-nav { display: flex; align-items: center; gap: 20px; }
+  .single-nav { display: flex; align-items: center; gap: 16px; }
 
   .single-nav button {
     padding: 6px 16px;
@@ -416,6 +417,47 @@
   }
 
   .single-nav button:hover { background: var(--fg); color: var(--bg); }
+
+  .side-arrow {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    color: var(--fg);
+    font-size: 18px;
+    font-family: inherit;
+    z-index: 50;
+    transition: all 0.1s;
+    opacity: 0.6;
+  }
+  .side-arrow:hover { opacity: 1; background: var(--fg); color: var(--bg); }
+  .side-arrow.left { left: calc(var(--sidebar-w) + 6px); border-radius: 4px; }
+  .side-arrow.right { right: 6px; border-radius: 4px; }
+
+  /* Grid item hover +/- */
+  .grid-item-wrap { position: relative; cursor: pointer; }
+  .grid-item-rate {
+    position: absolute; top: 2px; right: 2px;
+    display: none; gap: 2px; z-index: 10;
+  }
+  .grid-item-wrap:hover .grid-item-rate { display: flex; }
+  .grid-item-rate button {
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 50%; cursor: pointer;
+    color: var(--muted); font-size: 11px; font-family: inherit;
+    line-height: 1; padding: 0; transition: all 0.1s;
+  }
+  .grid-item-rate button:hover { border-color: var(--fg); color: var(--fg); }
+  .grid-item-rate button.liked { background: var(--fg); border-color: var(--fg); color: var(--bg); }
 
   .variant-line {
     display: flex;
@@ -840,7 +882,7 @@ function renderSidebar() {
       html += `<div class="tier-label">${s.tier}</div>`;
       lastTier = s.tier;
     }
-    const active = activeSets.has(s.id) ? ' active' : '';
+    const active = (activeSets.has(s.id) && !activeSets.has('__all__')) ? ' active' : '';
     const liked = likedSets.has(s.id) ? ' set-liked' : '';
     html += `<div class="set-item${active}" onclick="loadSet('${s.id}')">
       <div class="dot"></div>
@@ -941,10 +983,11 @@ function filterSets(q) {
 
 function toggleFilter(type) {
   activeFilter = activeFilter === type ? null : type;
-  // "All" (null) clears filter; for buttons/loading also clears category selection to show all
+  // "All" (null) clears filter and shows everything
   if (activeFilter === null) {
     if (appMode === 'buttons') activeButtonCats.clear();
     if (appMode === 'loading') activeLoadingCats.clear();
+    if (appMode === 'icons') { activeSets.clear(); activeSets.add('__all__'); }
   }
   renderSidebar();
   renderCanvas();
@@ -2848,20 +2891,28 @@ function renderButtonCanvas() {
   }
 
   let count = 0;
-  canvas.innerHTML = Object.values(groups).map(g => {
+  canvas.innerHTML = Object.entries(groups).map(([catIdx, g]) => {
     const darkBg = g.dark ? ' dark-bg' : '';
     count += g.buttons.length;
-    return `<div class="btn-cat-section">
+    return `<div class="btn-cat-section" data-cat-idx="${catIdx}">
       <div class="btn-cat-header">${g.category} <span style="font-weight:400;color:#aaa">${g.buttons.length}</span></div>
       <div class="btn-cat-grid${darkBg}">${g.buttons.map((b, i) => {
         const globalIdx = allBtns.indexOf(b);
         const btnScale = currentScale / 48;
-        return `<div style="cursor:pointer" onclick="openButtonSingle(${globalIdx})">${renderBtnHtml(b.btn, btnScale)}</div>`;
+        const btnId = b.id || `${b.catIdx}:${b.btnIdx}`;
+        const bLiked = likedButtons.has(btnId);
+        return `<div class="grid-item-wrap" onclick="openButtonSingle(${globalIdx})">
+          <div class="grid-item-rate">
+            <button onclick="event.stopPropagation();rateButton('${btnId}','minus')" title="Hide">&minus;</button>
+            <button class="${bLiked ? 'liked' : ''}" onclick="event.stopPropagation();rateButton('${btnId}','plus')" title="${bLiked ? 'Unlike' : 'Like'}">&plus;</button>
+          </div>
+          ${renderBtnHtml(b.btn, btnScale)}</div>`;
       }).join('')}</div>
     </div>`;
   }).join('');
   canvas.insertAdjacentHTML('afterbegin',
     `<div style="font-size:12px;color:var(--muted);margin-bottom:16px">${count} button styles across ${Object.keys(groups).length} categories</div>`);
+  setupScrollSync(canvas, 'button');
 }
 
 function renderButtonSingleView(canvas, allBtns) {
@@ -2898,12 +2949,7 @@ function renderButtonSingleView(canvas, allBtns) {
         </div>`;
       }).join('')}</div>
       <div class="single-icon-name">${catBtns.length} style${catBtns.length !== 1 ? 's' : ''} in category</div>
-      <div class="single-nav">
-        ${rateHtml}
-        <button onclick="navButtonSingle(-1)">&larr; Prev</button>
-        <span class="single-icon-name">${buttonSingleIndex + 1} / ${allBtns.length}</span>
-        <button onclick="navButtonSingle(1)">Next &rarr;</button>
-      </div>
+      ${singleNavHtml('navButtonSingle(-1)','navButtonSingle(1)',rateHtml,buttonSingleIndex,allBtns.length)}
     </div>`;
     return;
   }
@@ -2918,12 +2964,7 @@ function renderButtonSingleView(canvas, allBtns) {
     </div>
     <div class="single-icon-name" style="font-size:12px;margin-top:12px">${c.btn.label}</div>
     <div style="font-size:10px;color:var(--muted);max-width:500px;word-break:break-all;text-align:center;margin-top:4px;flex-shrink:0">${c.btn.style}</div>
-    <div class="single-nav" style="margin-top:16px;flex-shrink:0">
-      ${rateHtml}
-      <button onclick="navButtonSingle(-1)">&larr; Prev</button>
-      <span class="single-icon-name">${buttonSingleIndex + 1} / ${allBtns.length}</span>
-      <button onclick="navButtonSingle(1)">Next &rarr;</button>
-    </div>
+    ${singleNavHtml('navButtonSingle(-1)','navButtonSingle(1)',rateHtml,buttonSingleIndex,allBtns.length)}
   </div>`;
 }
 
@@ -3043,19 +3084,27 @@ function renderLoadingCanvas() {
   }
   let count = 0;
   const loadScale = currentScale / 48;
-  canvas.innerHTML = Object.values(groups).map(g => {
+  canvas.innerHTML = Object.entries(groups).map(([catIdx, g]) => {
     const darkBg = g.dark ? ' dark-bg' : '';
     count += g.items.length;
-    return `<div class="btn-cat-section">
+    return `<div class="btn-cat-section" data-cat-idx="${catIdx}">
       <div class="btn-cat-header">${g.category} <span style="font-weight:400;color:#aaa">${g.items.length}</span></div>
       <div class="btn-cat-grid${darkBg}">${g.items.map(b => {
         const globalIdx = allItems.indexOf(b);
-        return `<div style="cursor:pointer;padding:12px" onclick="openLoadingSingle(${globalIdx})">${renderLoadingHtml(b.btn, loadScale)}</div>`;
+        const lid = b.id || `${b.catIdx}:${b.btnIdx}`;
+        const lLiked = likedLoading.has(lid);
+        return `<div class="grid-item-wrap" style="padding:12px" onclick="openLoadingSingle(${globalIdx})">
+          <div class="grid-item-rate">
+            <button onclick="event.stopPropagation();rateLoading('${lid}','minus')" title="Hide">&minus;</button>
+            <button class="${lLiked ? 'liked' : ''}" onclick="event.stopPropagation();rateLoading('${lid}','plus')" title="${lLiked ? 'Unlike' : 'Like'}">&plus;</button>
+          </div>
+          ${renderLoadingHtml(b.btn, loadScale)}</div>`;
       }).join('')}</div>
     </div>`;
   }).join('');
   canvas.insertAdjacentHTML('afterbegin',
     `<div style="font-size:12px;color:var(--muted);margin-bottom:16px">${count} loading styles across ${Object.keys(groups).length} categories</div>`);
+  setupScrollSync(canvas, 'loading');
 }
 
 function renderLoadingSingleView(canvas, allItems) {
@@ -3084,12 +3133,7 @@ function renderLoadingSingleView(canvas, allItems) {
         </div>`;
       }).join('')}</div>
       <div class="single-icon-name">${catItems.length} style${catItems.length !== 1 ? 's' : ''}</div>
-      <div class="single-nav">
-        ${rateHtml}
-        <button onclick="navLoadingSingle(-1)">&larr; Prev</button>
-        <span class="single-icon-name">${loadingSingleIndex + 1} / ${allItems.length}</span>
-        <button onclick="navLoadingSingle(1)">Next &rarr;</button>
-      </div>
+      ${singleNavHtml('navLoadingSingle(-1)','navLoadingSingle(1)',rateHtml,loadingSingleIndex,allItems.length)}
     </div>`;
     return;
   }
@@ -3103,11 +3147,7 @@ function renderLoadingSingleView(canvas, allItems) {
     <div class="single-icon-name" style="font-size:12px;margin-top:12px">${c.btn.label}</div>
     <div style="font-size:10px;color:var(--muted);max-width:500px;word-break:break-all;text-align:center;margin-top:4px;flex-shrink:0">${c.btn.style}</div>
     <div class="single-nav" style="margin-top:16px;flex-shrink:0">
-      ${rateHtml}
-      <button onclick="navLoadingSingle(-1)">&larr; Prev</button>
-      <span class="single-icon-name">${loadingSingleIndex + 1} / ${allItems.length}</span>
-      <button onclick="navLoadingSingle(1)">Next &rarr;</button>
-    </div>
+    ${singleNavHtml('navLoadingSingle(-1)','navLoadingSingle(1)',rateHtml,loadingSingleIndex,allItems.length)}
   </div>`;
 }
 
@@ -3186,6 +3226,14 @@ async function renderCanvas() {
       if (cached) return cached.some(name => name.toLowerCase().includes(searchFilter));
       return s.sample.some(name => name.toLowerCase().includes(searchFilter));
     });
+  } else if (activeSets.has('__all__')) {
+    // "All" mode: show all non-hidden sets, load progressively
+    displaySets = SETS.filter(s => !hiddenSets.has(s.id));
+    // Apply type filters
+    if (activeFilter === 'color') displaySets = displaySets.filter(s => s.palette);
+    else if (activeFilter === 'animated') displaySets = displaySets.filter(s => s.animated);
+    else if (activeFilter === 'stroke') displaySets = displaySets.filter(s => s.stroke);
+    else if (activeFilter === 'liked') displaySets = displaySets.filter(s => likedSets.has(s.id));
   } else {
     displaySets = SETS.filter(s => activeSets.has(s.id));
   }
@@ -3195,15 +3243,42 @@ async function renderCanvas() {
     return;
   }
 
+  // "All" mode uses progressive loading like search does
+  const isAllMode = activeSets.has('__all__');
+
   // Split into cached (render now) and uncached (fetch progressively)
   const cached = displaySets.filter(s => iconCache[s.prefix]);
   const uncached = displaySets.filter(s => !iconCache[s.prefix]);
 
-  // For non-search mode, fetch all needed sets before rendering
-  if (!searchFilter && uncached.length) {
+  // For single set selection, fetch all needed before rendering
+  if (!searchFilter && !isAllMode && uncached.length) {
     canvas.innerHTML = '<div class="empty-state">Loading icons...</div>';
     await Promise.all(uncached.map(s => fetchIcons(s.prefix)));
     displaySets = displaySets.filter(s => getIcons(s).length > 0);
+  }
+
+  // "All" mode: render cached immediately, stream rest
+  if (isAllMode && !searchFilter) {
+    canvas.style.overflowY = 'auto';
+    canvas.style.overflowX = 'hidden';
+    canvas.style.flexDirection = 'column';
+    if (currentView === 'single' || currentView === 'versions') {
+      if (uncached.length) await Promise.all(uncached.map(s => fetchIcons(s.prefix)));
+      displaySets = displaySets.filter(s => getIcons(s).length > 0);
+      return renderSingleView(canvas, displaySets);
+    }
+    const readySets = cached.filter(s => getIcons(s).length > 0);
+    renderIconGrid(canvas, readySets);
+    if (uncached.length) {
+      const currentFilter = activeFilter;
+      for (const s of uncached) {
+        await fetchIcons(s.prefix);
+        if (activeFilter !== currentFilter || !activeSets.has('__all__')) return;
+        const icons = getIcons(s);
+        if (icons.length > 0) appendSetToCanvas(canvas, s);
+      }
+    }
+    return;
   }
 
   // For search mode, render cached results immediately, then stream uncached
@@ -3246,7 +3321,12 @@ function buildSetHtml(s, gridStyle, cellSize) {
       <span class="set-section-author">${s.author}</span>
     </div>
     <div class="icon-grid" style="${gridStyle}">${icons.map(ic => {
-      return `<div class="icon-cell" style="width:${cellSize}px" data-icon="${ic.icon}">
+      const iLiked = likedIcons.has(ic.icon);
+      return `<div class="icon-cell grid-item-wrap" style="width:${cellSize}px" data-icon="${ic.icon}">
+        <div class="grid-item-rate">
+          <button onclick="event.stopPropagation();rateIcon('${ic.icon}','minus')">&minus;</button>
+          <button class="${iLiked ? 'liked' : ''}" onclick="event.stopPropagation();rateIcon('${ic.icon}','plus')">&plus;</button>
+        </div>
         <iconify-icon icon="${ic.icon}" width="${currentScale}" height="${currentScale}"></iconify-icon>
         <div class="tooltip">${ic.icon}</div>
       </div>`;
@@ -3357,12 +3437,7 @@ function renderSingleView(canvas, active) {
         </div>`;
       }).join('')}</div>
       <div class="single-icon-name">${variants.length} variant${variants.length !== 1 ? 's' : ''}</div>
-      <div class="single-nav">
-        ${rateHtml}
-        <button onclick="navSingle(-1)">&larr; Prev</button>
-        <span class="single-icon-name">${singleIndex + 1} / ${uniqueIcons.length}</span>
-        <button onclick="navSingle(1)">Next &rarr;</button>
-      </div>
+      ${singleNavHtml('navSingle(-1)','navSingle(1)',rateHtml,singleIndex,uniqueIcons.length)}
     </div>`;
     return;
   }
@@ -3382,12 +3457,7 @@ function renderSingleView(canvas, active) {
     </div>
     <div class="single-icon-name">${c.icon}</div>
     ${variantHtml}
-    <div class="single-nav">
-      ${rateHtml}
-      <button onclick="navSingle(-1)">&larr; Prev</button>
-      <span class="single-icon-name">${singleIndex + 1} / ${uniqueIcons.length}</span>
-      <button onclick="navSingle(1)">Next &rarr;</button>
-    </div>
+    ${singleNavHtml('navSingle(-1)','navSingle(1)',rateHtml,singleIndex,uniqueIcons.length)}
   </div>`;
 }
 
@@ -3410,6 +3480,15 @@ function animateIcons() {
 }
 
 function navSingle(dir) { singleIndex += dir; selectedVariant = null; renderCanvas(); }
+
+function singleNavHtml(prevFn, nextFn, rateHtml, idx, total) {
+  return `<button class="side-arrow left" onclick="${prevFn}">&larr;</button>
+    <button class="side-arrow right" onclick="${nextFn}">&rarr;</button>
+    <div class="single-nav">
+      ${rateHtml}
+      <span class="single-icon-name">${idx + 1} / ${total}</span>
+    </div>`;
+}
 
 function openSingle(idx) {
   // Convert grid index to unique base icon index
@@ -3556,6 +3635,35 @@ async function navSet(dir) {
   // Scroll active item into view
   const el = document.querySelector('.set-item.active');
   if (el) el.scrollIntoView({ block: 'nearest' });
+}
+
+// Scroll sync: as user scrolls grid, update sidebar selection to match visible category
+let scrollSyncObserver = null;
+function setupScrollSync(canvas, mode) {
+  if (scrollSyncObserver) scrollSyncObserver.disconnect();
+  const sections = canvas.querySelectorAll('.btn-cat-section[data-cat-idx]');
+  if (!sections.length) return;
+  scrollSyncObserver = new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        const idx = parseInt(entry.target.dataset.catIdx);
+        if (isNaN(idx)) continue;
+        // Update sidebar highlight without re-rendering
+        document.querySelectorAll('.set-item').forEach(el => {
+          const onclick = el.getAttribute('onclick') || '';
+          const match = onclick.match(/load(?:Button|Loading)Cat\((\d+)\)/);
+          if (match) {
+            el.classList.toggle('active', parseInt(match[1]) === idx);
+          }
+        });
+        // Scroll sidebar item into view
+        const activeEl = document.querySelector('.set-item.active');
+        if (activeEl) activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        break;
+      }
+    }
+  }, { root: canvas, rootMargin: '-20% 0px -60% 0px' });
+  sections.forEach(s => scrollSyncObserver.observe(s));
 }
 
 document.addEventListener('keydown', e => {
