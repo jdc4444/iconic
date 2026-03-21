@@ -100,6 +100,7 @@
 
   .sidebar-sort {
     display: flex;
+    flex-wrap: wrap;
     gap: 4px;
     padding: 8px 12px;
     border-bottom: 1px solid var(--border);
@@ -550,33 +551,7 @@
     font-size: 12px;
   }
 
-  .sidebar-filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    padding: 8px 12px;
-  }
-
-  .filter-btn {
-    padding: 6px 12px;
-    font-size: 11px;
-    font-family: inherit;
-    font-weight: 500;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
-  .filter-btn:hover { color: var(--fg); border-color: var(--fg); }
-
-  .filter-btn.active {
-    background: var(--fg);
-    color: var(--bg);
-    border-color: var(--fg);
-  }
+  /* filter-btn class removed, using sort-btn for unified controls */
 
   .keyboard-hint {
     padding: 6px 12px;
@@ -670,15 +645,11 @@
       <button class="mode-tab" id="modeButtons" onclick="setMode('buttons')">Buttons</button>
       <button class="mode-tab" id="modeLoading" onclick="setMode('loading')">Loading</button>
     </div>
-    <div class="sidebar-sort">
-      <button class="sort-btn active" id="btnSortCategory" onclick="setSortMode('category')">By Category</button>
-      <button class="sort-btn" id="btnSortName" onclick="setSortMode('name')">By Name</button>
-    </div>
+    <div class="sidebar-sort" id="sidebarControls"></div>
     <div class="set-list" id="setList"></div>
     <div class="sidebar-search">
       <input type="text" id="searchInput" placeholder="Search sets..." oninput="filterSets(this.value)">
     </div>
-    <div class="sidebar-filters" id="sidebarFilters"></div>
     <div class="keyboard-hint">
       <kbd>↑</kbd><kbd>↓</kbd> Sets <kbd>←</kbd><kbd>→</kbd> Icons <kbd>Space</kbd> Versions <kbd>F</kbd> Full <kbd>D</kbd> Dark <kbd>Esc</kbd> Exit
     </div>
@@ -821,8 +792,6 @@ function setMode(mode) {
 
 function setSortMode(mode) {
   sortMode = mode;
-  document.getElementById('btnSortCategory').classList.toggle('active', mode === 'category');
-  document.getElementById('btnSortName').classList.toggle('active', mode === 'name');
   renderSidebar();
   saveState();
 }
@@ -835,9 +804,7 @@ function renderSidebar() {
 
   // Restore icon-mode UI
   document.getElementById('searchInput').placeholder = 'Search sets...';
-  document.querySelector('.sidebar-filters').style.display = '';
-  document.querySelector('.sidebar-sort').style.display = '';
-  renderFilterButtons('icons');
+  renderControls('icons');
 
   let filtered = searchFilter
     ? SETS.filter(s => {
@@ -926,37 +893,31 @@ function renderButtonSidebar(el) {
   el.innerHTML = html;
   // Update search placeholder and show shared controls
   document.getElementById('searchInput').placeholder = 'Search buttons...';
-  document.querySelector('.sidebar-filters').style.display = '';
-  document.querySelector('.sidebar-sort').style.display = '';
-  renderFilterButtons('buttons');
+  renderControls('buttons');
 }
 
-function renderFilterButtons(mode) {
-  const el = document.getElementById('sidebarFilters');
-  const filters = mode === 'icons'
-    ? [
-        { id: null, label: 'All' },
-        { id: 'color', label: 'Color' },
-        { id: 'animated', label: 'Animated' },
-        { id: 'stroke', label: 'Stroke' },
-        { id: 'emoji', label: 'Emoji' },
-        { id: 'material', label: 'Material' },
-        { id: 'liked', label: 'Liked' },
-      ]
+function renderControls(mode) {
+  const el = document.getElementById('sidebarControls');
+  // Combined row: All | Name | Category | Liked + mode-specific filters
+  const modeFilters = mode === 'icons'
+    ? [{ id: 'color', label: 'Color' }, { id: 'animated', label: 'Animated' }, { id: 'stroke', label: 'Stroke' }, { id: 'emoji', label: 'Emoji' }, { id: 'material', label: 'Material' }]
     : mode === 'loading'
-    ? [
-        { id: null, label: 'All' },
-        { id: 'dark', label: 'Dark BG' },
-        { id: 'liked', label: 'Liked' },
-      ]
-    : [
-        { id: null, label: 'All' },
-        { id: 'dark', label: 'Dark BG' },
-        { id: 'liked', label: 'Liked' },
-      ];
-  el.innerHTML = filters.map(f =>
-    `<button class="filter-btn${activeFilter === f.id ? ' active' : ''}" onclick="toggleFilter(${f.id === null ? 'null' : "'" + f.id + "'"})">${f.label}</button>`
-  ).join('');
+    ? [{ id: 'dark', label: 'Dark' }]
+    : [{ id: 'dark', label: 'Dark' }];
+
+  const isAll = activeFilter === null;
+  const isName = sortMode === 'name';
+  const isCat = sortMode === 'category' && activeFilter !== 'liked';
+  const isLiked = activeFilter === 'liked';
+
+  let html = `<button class="sort-btn${isAll && !isLiked ? ' active' : ''}" onclick="toggleFilter(null);setSortMode('category')">All</button>`;
+  html += `<button class="sort-btn${isName && !isLiked ? ' active' : ''}" onclick="setSortMode('name');toggleFilter(null)">Name</button>`;
+  html += `<button class="sort-btn${isCat && !isAll && !isLiked ? ' active' : ''}" onclick="setSortMode('category');toggleFilter(null)">Category</button>`;
+  html += `<button class="sort-btn${isLiked ? ' active' : ''}" onclick="toggleFilter('liked')">Liked</button>`;
+  for (const f of modeFilters) {
+    html += `<button class="sort-btn${activeFilter === f.id ? ' active' : ''}" onclick="toggleFilter('${f.id}')">${f.label}</button>`;
+  }
+  el.innerHTML = html;
 }
 
 function loadButtonCat(idx) {
@@ -1197,7 +1158,7 @@ const BUTTON_CATALOG = [
     B('Fire','background:linear-gradient(#fff,#fff) padding-box,linear-gradient(135deg,#f83600,#f9d423) border-box;color:#f83600;border:2px solid transparent;border-radius:6px'),
     B('Pill','background:linear-gradient(#fff,#fff) padding-box,linear-gradient(90deg,#667eea,#764ba2) border-box;color:#764ba2;border:2px solid transparent;border-radius:9999px;padding:8px 28px'),
   ]},
-  { category: 'Neon Glow', dark: true, buttons: [
+  { category: 'Neon Glow', buttons: [
     B('Cyan','background:transparent;color:#00d4ff;border:2px solid #00d4ff;border-radius:4px;box-shadow:0 0 10px rgba(0,212,255,0.5),0 0 20px rgba(0,212,255,0.3),inset 0 0 10px rgba(0,212,255,0.1);text-shadow:0 0 8px rgba(0,212,255,0.7)'),
     B('Green','background:transparent;color:#39ff14;border:2px solid #39ff14;border-radius:4px;box-shadow:0 0 10px rgba(57,255,20,0.5),0 0 20px rgba(57,255,20,0.3);text-shadow:0 0 8px rgba(57,255,20,0.7)'),
     B('Pink','background:transparent;color:#ff00ff;border:2px solid #ff00ff;border-radius:4px;box-shadow:0 0 10px rgba(255,0,255,0.5),0 0 20px rgba(255,0,255,0.3);text-shadow:0 0 8px rgba(255,0,255,0.7)'),
@@ -1206,7 +1167,7 @@ const BUTTON_CATALOG = [
     B('Orange','background:transparent;color:#ff6600;border:2px solid #ff6600;border-radius:4px;box-shadow:0 0 10px rgba(255,102,0,0.5),0 0 20px rgba(255,102,0,0.3);text-shadow:0 0 8px rgba(255,102,0,0.7)'),
     B('White','background:transparent;color:#fff;border:2px solid #fff;border-radius:4px;box-shadow:0 0 10px rgba(255,255,255,0.4),0 0 20px rgba(255,255,255,0.2);text-shadow:0 0 8px rgba(255,255,255,0.5)'),
   ]},
-  { category: 'Glassmorphism', dark: true, buttons: [
+  { category: 'Glassmorphism', buttons: [
     B('Light','background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:12px;backdrop-filter:blur(10px)'),
     B('Dark','background:rgba(0,0,0,0.25);color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:12px;backdrop-filter:blur(10px)'),
     B('Tinted','background:rgba(25,118,210,0.2);color:#fff;border:1px solid rgba(25,118,210,0.3);border-radius:12px;backdrop-filter:blur(12px)'),
@@ -1265,7 +1226,7 @@ const BUTTON_CATALOG = [
     B('Dotted Blue','background:transparent;color:#1976d2;border:2px dotted #1976d2;border-radius:6px'),
     B('Drop Zone','background:#fafafa;color:#999;border:3px dashed #ccc;border-radius:12px;padding:20px 32px'),
   ]},
-  { category: 'Inverse (on dark)', dark: true, buttons: [
+  { category: 'Inverse (on dark)', buttons: [
     B('Filled','background:#fff;color:#000;border:none;border-radius:4px'),
     B('Outlined','background:transparent;color:#fff;border:2px solid #fff;border-radius:4px'),
     B('Ghost','background:transparent;color:#fff;border:none;border-radius:4px'),
@@ -1412,7 +1373,7 @@ const BUTTON_CATALOG = [
     B('Indigo Clay','background:#818cf8;color:#fff;border:none;border-radius:20px;box-shadow:0 8px 0 #4f46e5,0 12px 20px rgba(79,70,229,0.35),inset 0 -4px 0 rgba(0,0,0,0.15);font-weight:700'),
     B('White Clay','background:#f1f5f9;color:#475569;border:none;border-radius:20px;box-shadow:0 8px 0 #cbd5e1,0 12px 20px rgba(100,116,139,0.2),inset 0 -4px 0 rgba(0,0,0,0.08);font-weight:700'),
   ]},
-  { category: 'Cyberpunk', dark: true, buttons: [
+  { category: 'Cyberpunk', buttons: [
     B('Neon Yellow','background:#0a0a0a;color:#f0ff00;border:1px solid #f0ff00;border-radius:0;font-family:monospace;font-weight:700;text-transform:uppercase;letter-spacing:3px;box-shadow:0 0 8px #f0ff00,inset 0 0 8px rgba(240,255,0,0.1);clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%)'),
     B('Cyber Red','background:linear-gradient(135deg,#1a0000,#330000);color:#ff0040;border:1px solid #ff0040;border-radius:0;font-family:monospace;font-weight:700;text-transform:uppercase;letter-spacing:2px;box-shadow:0 0 10px rgba(255,0,64,0.6),inset 0 0 10px rgba(255,0,64,0.1);clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%)'),
     B('Hologram','background:linear-gradient(135deg,rgba(0,255,255,0.1),rgba(255,0,255,0.1));color:#00ffff;border:1px solid rgba(0,255,255,0.5);border-radius:2px;font-family:monospace;font-weight:700;text-transform:uppercase;letter-spacing:2px;box-shadow:0 0 15px rgba(0,255,255,0.3),0 0 30px rgba(255,0,255,0.2);text-shadow:0 0 10px #00ffff'),
@@ -1422,7 +1383,7 @@ const BUTTON_CATALOG = [
     B('Neural','background:rgba(0,20,40,0.9);color:#7df9ff;border:1px solid rgba(125,249,255,0.4);border-radius:4px;font-family:monospace;font-weight:700;letter-spacing:2px;box-shadow:0 0 20px rgba(125,249,255,0.2),inset 0 0 20px rgba(125,249,255,0.05)'),
     B('Neon Pink','background:#0a000f;color:#ff00ff;border:1px solid #ff00ff;border-radius:0;font-family:monospace;font-weight:700;text-transform:uppercase;letter-spacing:2px;box-shadow:0 0 8px #ff00ff,0 0 20px rgba(255,0,255,0.4),inset 0 0 8px rgba(255,0,255,0.1)'),
   ]},
-  { category: 'Vaporwave', dark: true, buttons: [
+  { category: 'Vaporwave', buttons: [
     B('Palm Wave','background:linear-gradient(135deg,#ff71ce,#b967ff,#05ffa1);color:#fff;border:none;border-radius:0;font-weight:700;letter-spacing:3px;text-transform:uppercase;box-shadow:4px 4px 0 #ff71ce'),
     B('Grid','background:#1a0030;color:#ff71ce;border:2px solid #ff71ce;border-radius:0;font-weight:700;letter-spacing:2px;text-transform:uppercase;box-shadow:0 0 15px rgba(255,113,206,0.5),inset 0 0 30px rgba(255,113,206,0.05)'),
     B('Sunset Retro','background:linear-gradient(180deg,#ff6ec7,#ff9a3c,#ffe84a);color:#1a0030;border:none;border-radius:2px;font-weight:900;letter-spacing:2px;text-transform:uppercase'),
@@ -1510,7 +1471,7 @@ const BUTTON_CATALOG = [
     B('₿ Crypto','background:#f7931a;color:#fff;border:none;border-radius:4px;font-weight:700'),
     B('$ Deposit','background:#155724;color:#d4edda;border:none;border-radius:4px;font-weight:700'),
   ]},
-  { category: 'Gaming', dark: true, buttons: [
+  { category: 'Gaming', buttons: [
     B('PLAY','background:linear-gradient(135deg,#11998e,#38ef7d);color:#000;border:none;border-radius:4px;font-weight:900;font-size:15px;text-transform:uppercase;letter-spacing:3px;box-shadow:0 4px 15px rgba(56,239,125,0.4)'),
     B('FIGHT','background:linear-gradient(135deg,#f83600,#f9d423);color:#000;border:none;border-radius:0;font-weight:900;font-size:15px;text-transform:uppercase;letter-spacing:3px;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%)'),
     B('LOOT','background:linear-gradient(135deg,#f7971e,#ffd200);color:#1a0a00;border:none;border-radius:4px;font-weight:900;text-transform:uppercase;letter-spacing:2px;box-shadow:0 0 15px rgba(255,210,0,0.4)'),
@@ -1652,7 +1613,7 @@ const BUTTON_CATALOG = [
     B('Tricolor','background:linear-gradient(90deg,#002395 33%,#fff 33% 67%,#ed2939 67%);color:#002395;border:none;border-radius:4px;font-weight:700;text-shadow:1px 1px 2px rgba(255,255,255,0.8)'),
     B('Iridescent','background:linear-gradient(135deg,#a8edea,#fed6e3,#d4fc79,#a8edea);background-size:300%;color:#333;border:none;border-radius:4px;font-weight:700;animation:btn-rainbow 6s linear infinite'),
   ]},
-  { category: 'Aurora / Northern Lights', dark: true, buttons: [
+  { category: 'Aurora / Northern Lights', buttons: [
     B('Aurora 1','background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);color:#00ff88;border:none;border-radius:12px;font-weight:700;box-shadow:0 0 30px rgba(0,255,136,0.2),0 0 60px rgba(0,136,255,0.1)'),
     B('Aurora 2','background:linear-gradient(135deg,#000428,#004e92);color:#88ffdd;border:none;border-radius:12px;font-weight:700;box-shadow:0 0 30px rgba(136,255,221,0.15)'),
     B('Aurora 3','background:linear-gradient(135deg,#1a0533,#0d3a6e);color:#ff88ff;border:none;border-radius:12px;font-weight:700;box-shadow:0 0 30px rgba(255,136,255,0.2)'),
@@ -1784,7 +1745,7 @@ const BUTTON_CATALOG = [
     B('Grid Box','background:repeating-linear-gradient(0deg,rgba(0,0,255,0.05) 0px,rgba(0,0,255,0.05) 1px,transparent 1px,transparent 20px),repeating-linear-gradient(90deg,rgba(0,0,255,0.05) 0px,rgba(0,0,255,0.05) 1px,transparent 1px,transparent 20px),#fff;color:#0033cc;border:1px solid #0033cc;border-radius:0;font-family:monospace;font-size:11px;font-weight:700'),
     B('Prototype','background:#f5f5f5;color:#888;border:2px dashed #ccc;border-radius:4px;font-family:monospace;font-size:12px;font-style:italic'),
   ]},
-  { category: 'Dark Mode Native', dark: true, buttons: [
+  { category: 'Dark Mode Native', buttons: [
     B('Dark Primary','background:#90caf9;color:#0d47a1;border:none;border-radius:4px;font-weight:700'),
     B('Dark Secondary','background:#ce93d8;color:#4a148c;border:none;border-radius:4px;font-weight:700'),
     B('Dark Surface','background:#1e1e1e;color:#fff;border:1px solid #333;border-radius:4px'),
@@ -2112,7 +2073,7 @@ const BUTTON_CATALOG = [
     B('Onyx','background:#353839;color:#fff;border:none;border-radius:4px;font-weight:700'),
     B('Pearl','background:linear-gradient(135deg,#f5f5f0,#eae8e0,#f5f5f0);color:#555;border:1px solid #d0cec8;border-radius:4px;font-weight:700'),
   ]},
-  { category: 'Monospace / Terminal', dark: true, buttons: [
+  { category: 'Monospace / Terminal', buttons: [
     B('$ run','background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;font-family:monospace;font-weight:500;font-size:12px'),
     B('git push','background:#238636;color:#fff;border:none;border-radius:6px;font-family:monospace;font-weight:600;font-size:12px'),
     B('git pull','background:#1f6feb;color:#fff;border:none;border-radius:6px;font-family:monospace;font-weight:600;font-size:12px'),
@@ -2290,7 +2251,7 @@ const BUTTON_CATALOG = [
     B('Upload File','background:transparent;color:#6b7280;border:2px dashed #d1d5db;border-radius:12px;padding:24px 32px;font-weight:500'),
     B('Get Started →','background:transparent;color:#4f46e5;border:none;font-weight:600;font-size:14px'),
   ]},
-  // === More Unique Visual Treatments ===  { category: 'Multi-Color Split', buttons: [
+  { category: 'Multi-Color Split', buttons: [
     B('Half Blue/Red','background:linear-gradient(90deg,#1976d2 50%,#d32f2f 50%);color:#fff;border:none;border-radius:6px;font-weight:700'),
     B('Half Black/White','background:linear-gradient(90deg,#000 50%,#fff 50%);color:#fff;border:1px solid #000;border-radius:6px;font-weight:700;text-shadow:1px 0 0 #000,-1px 0 0 #fff'),
     B('Tri Stripe','background:linear-gradient(90deg,#e74c3c 33%,#f1c40f 33% 66%,#27ae60 66%);color:#fff;border:none;border-radius:6px;font-weight:700;text-shadow:1px 1px 2px rgba(0,0,0,0.3)'),
@@ -2311,7 +2272,8 @@ const BUTTON_CATALOG = [
     B('Opacity 50%','background:transparent;color:#000;border:none;opacity:0.5;font-weight:600'),
     B('All Caps','background:transparent;color:#333;border:none;text-transform:uppercase;font-weight:800;letter-spacing:3px;font-size:11px'),
     B('Small','background:transparent;color:#666;border:none;font-size:10px;font-weight:400'),
-  ]},  // === Extended Border Radius Library ===  // === Extended Shadow Library ===  { category: 'Neon Signs', dark: true, buttons: [
+  ]},
+  { category: 'Neon Signs', buttons: [
     B('OPEN','background:transparent;color:#ff073a;border:2px solid #ff073a;border-radius:4px;font-weight:900;text-transform:uppercase;letter-spacing:4px;text-shadow:0 0 7px #ff073a,0 0 14px #ff073a;box-shadow:0 0 7px #ff073a,0 0 14px rgba(255,7,58,0.5),inset 0 0 7px rgba(255,7,58,0.2)'),
     B('BAR','background:transparent;color:#00d4ff;border:2px solid #00d4ff;border-radius:4px;font-weight:900;text-transform:uppercase;letter-spacing:6px;text-shadow:0 0 7px #00d4ff,0 0 14px #00d4ff;box-shadow:0 0 7px #00d4ff,0 0 14px rgba(0,212,255,0.5),inset 0 0 7px rgba(0,212,255,0.2)'),
     B('HOTEL','background:transparent;color:#ffff00;border:2px solid #ffff00;border-radius:4px;font-weight:900;text-transform:uppercase;letter-spacing:4px;text-shadow:0 0 7px #ffff00,0 0 14px #ffff00;box-shadow:0 0 7px #ffff00,0 0 14px rgba(255,255,0,0.5),inset 0 0 7px rgba(255,255,0,0.2)'),
@@ -2368,7 +2330,7 @@ const BUTTON_CATALOG = [
     B('SM','background:#2da44e;color:#fff;border:1px solid rgba(27,31,36,0.15);border-radius:6px;font-weight:500;font-family:system-ui;padding:3px 12px;font-size:12px'),
     B('LG','background:#2da44e;color:#fff;border:1px solid rgba(27,31,36,0.15);border-radius:6px;font-weight:500;font-family:system-ui;padding:12px 24px;font-size:16px'),
   ]},
-  // === Extended Animations ===  { category: 'Weather App', buttons: [
+  { category: 'Weather App', buttons: [
     B('☀ Sunny','background:linear-gradient(135deg,#f7971e,#ffd200);color:#333;border:none;border-radius:8px;font-weight:700'),
     B('☁ Cloudy','background:linear-gradient(135deg,#bdc3c7,#2c3e50);color:#fff;border:none;border-radius:8px;font-weight:700'),
     B('🌧 Rainy','background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:8px;font-weight:700'),
@@ -2378,7 +2340,7 @@ const BUTTON_CATALOG = [
     B('°F / °C','background:#f0f0f0;color:#333;border:1px solid #ddd;border-radius:9999px;padding:6px 16px;font-weight:600;font-size:12px'),
     B('10-Day','background:transparent;color:#1976d2;border:1px solid #1976d2;border-radius:6px;font-weight:500;font-size:12px'),
   ]},
-  { category: 'Crypto / Web3', dark: true, buttons: [
+  { category: 'Crypto / Web3', buttons: [
     B('Connect Wallet','background:linear-gradient(135deg,#627eea,#3c3c3d);color:#fff;border:none;border-radius:12px;font-weight:700;padding:12px 28px;box-shadow:0 4px 12px rgba(98,126,234,0.3)'),
     B('Swap','background:#21262d;color:#58a6ff;border:1px solid #30363d;border-radius:20px;font-weight:600;padding:10px 28px'),
     B('Mint NFT','background:linear-gradient(135deg,#8b5cf6,#ec4899);color:#fff;border:none;border-radius:12px;font-weight:700;padding:12px 28px;box-shadow:0 4px 15px rgba(139,92,246,0.4)'),
@@ -2449,7 +2411,7 @@ const BUTTON_CATALOG = [
     B('Platinum','background:linear-gradient(180deg,#eee,#ccc);color:#000;border:1px solid #888;padding:3px 20px;border-radius:6px;font-family:Charcoal,Geneva,sans-serif;font-size:12px;box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,0.2)'),
     B('Aqua Gel','background:linear-gradient(180deg,#b8e4ff 0%,#5eb4f5 40%,#3a8fd9 50%,#4ba3e8 60%,#7fc4f5 100%);color:#fff;border:1px solid #2c7ac4;padding:6px 20px;border-radius:16px;font-family:Lucida Grande,sans-serif;font-size:13px;text-shadow:0 -1px 0 rgba(0,0,0,0.2);box-shadow:inset 0 1px 2px rgba(255,255,255,0.5),0 2px 4px rgba(0,0,0,0.2)'),
   ]},
-  { category: 'visionOS', dark: true, buttons: [
+  { category: 'visionOS', buttons: [
     B('visionOS Glass','background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:10px 24px;border-radius:22px;font-family:-apple-system,sans-serif;font-weight:500;font-size:15px;backdrop-filter:blur(40px)'),
     B('visionOS Tinted','background:rgba(0,122,255,0.2);color:#fff;border:1px solid rgba(0,122,255,0.3);padding:10px 24px;border-radius:22px;font-family:-apple-system,sans-serif;font-weight:500;font-size:15px;backdrop-filter:blur(40px)'),
     B('visionOS Solid','background:rgba(255,255,255,0.25);color:#fff;border:none;padding:10px 24px;border-radius:22px;font-family:-apple-system,sans-serif;font-weight:600;font-size:15px;backdrop-filter:blur(40px);box-shadow:0 2px 8px rgba(0,0,0,0.15)'),
@@ -2591,7 +2553,7 @@ const BUTTON_CATALOG = [
     B('Autumn','background:linear-gradient(135deg,#d35400,#e74c3c,#c0392b);color:#fff;border:none;padding:10px 24px;border-radius:4px;font-weight:700'),
   ]},
   // === CURATED: Code Editor / Dev Tools ===
-  { category: 'Dev Tools', dark: true, buttons: [
+  { category: 'Dev Tools', buttons: [
     B('VS Code','background:#0e639c;color:#fff;border:none;padding:4px 14px;border-radius:2px;font-family:Segoe UI,sans-serif;font-size:13px'),
     B('GitHub Code','background:#f6f8fa;color:#24292f;border:1px solid #d0d7de;padding:4px 12px;border-radius:6px;font-family:SFMono-Regular,Consolas,monospace;font-size:12px'),
     B('Stack Overflow','background:#f48024;color:#fff;border:1px solid transparent;padding:10px 12px;border-radius:6px;font-family:-apple-system,Segoe UI,sans-serif;font-size:13px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.4)'),
@@ -2613,7 +2575,7 @@ const BUTTON_CATALOG = [
     B('Double Block','background:#fff;color:#000;border:2px solid #000;padding:12px 24px;border-radius:0;font-weight:900;text-transform:uppercase;outline:2px solid #000;outline-offset:4px'),
   ]},
   // === CURATED: Synthwave / Tron / Matrix ===
-  { category: 'Synthwave / Tron', dark: true, buttons: [
+  { category: 'Synthwave / Tron', buttons: [
     B('Synthwave','background:linear-gradient(180deg,#2b1055,#090116);color:#ff6ec7;border:1px solid #ff6ec7;padding:12px 24px;border-radius:0;font-family:Audiowide,sans-serif;text-transform:uppercase;letter-spacing:3px;text-shadow:0 0 10px rgba(255,110,199,0.5);box-shadow:0 4px 0 #ff6ec7'),
     B('Tron','background:#0c141f;color:#6fc3df;border:1px solid #6fc3df;padding:10px 24px;border-radius:0;font-family:Orbitron,sans-serif;font-size:12px;text-transform:uppercase;letter-spacing:4px;box-shadow:0 0 5px rgba(111,195,223,0.3),inset 0 0 5px rgba(111,195,223,0.1)'),
     B('Matrix','background:#000;color:#00ff41;border:1px solid #003b00;padding:10px 24px;border-radius:0;font-family:Courier New,monospace;font-weight:700;text-shadow:0 0 5px #00ff41,0 0 10px #00ff41'),
@@ -3007,9 +2969,7 @@ function renderLoadingSidebar(el) {
   }
   el.innerHTML = html;
   document.getElementById('searchInput').placeholder = 'Search loading...';
-  document.querySelector('.sidebar-filters').style.display = '';
-  document.querySelector('.sidebar-sort').style.display = '';
-  renderFilterButtons('loading');
+  renderControls('loading');
 }
 
 function loadLoadingCat(idx) {
