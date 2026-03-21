@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sampler",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "3480"],
+      "port": 3480,
+      "autoPort": false
+    }
+  ]
+}
