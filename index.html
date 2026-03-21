@@ -3821,7 +3821,7 @@ function saveState() {
 
 function applyState(s) {
   if (s.scale) { currentScale = s.scale; updateScale(); }
-  if (s.view) setView(s.view);
+  // Always open on grid view
   if (s.sortMode) setSortMode(s.sortMode);
   if (s.activeFilter) toggleFilter(s.activeFilter);
   if (s.appMode) setMode(s.appMode);
