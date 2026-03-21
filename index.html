@@ -772,6 +772,7 @@ const likedLoadingCats = new Set();
 const hiddenLoadingCats = new Set();
 const hiddenLoadingItems = new Set();
 const iconCache = {}; // prefix -> [icon names]
+let renderBatchToken = 0; // cancels stale chunked renders
 
 async function loadCollections() {
   const canvas = document.getElementById('canvas');
@@ -898,42 +899,42 @@ function renderSidebar() {
 }
 
 function renderButtonSidebar(el) {
-  let html = '';
-  let filtered = [];
+  // Group BUTTON_CATALOG entries by category name
+  const byName = {};
   BUTTON_CATALOG.forEach((cat, i) => {
     if (hiddenButtonCats.has(i)) return;
-    const catMatch = cat.category.toLowerCase().includes(searchFilter);
+    const name = cat.category;
+    if (!byName[name]) byName[name] = { name, indices: [], count: 0, dark: cat.dark };
+    const catMatch = name.toLowerCase().includes(searchFilter);
     const matchingBtns = searchFilter
       ? cat.buttons.filter(b => catMatch || b.label.toLowerCase().includes(searchFilter))
       : cat.buttons;
     if (searchFilter && matchingBtns.length === 0) return;
-    filtered.push({ idx: i, cat, count: searchFilter ? matchingBtns.length : cat.buttons.length });
+    byName[name].indices.push(i);
+    byName[name].count += searchFilter ? matchingBtns.length : cat.buttons.length;
   });
 
-  // Apply button-mode filters
-  if (activeFilter === 'liked') filtered = filtered.filter(f => likedButtonCats.has(f.idx));
-  if (activeFilter === 'dark') filtered = filtered.filter(f => f.cat.dark);
+  let filtered = Object.values(byName).filter(g => g.count > 0);
+  if (activeFilter === 'liked') filtered = filtered.filter(g => g.indices.some(i => likedButtonCats.has(i)));
+  if (activeFilter === 'dark') filtered = filtered.filter(g => g.dark);
+  if (sortMode === 'name') filtered.sort((a, b) => a.name.localeCompare(b.name));
 
-  // Sort
-  if (sortMode === 'name') {
-    filtered.sort((a, b) => a.cat.category.localeCompare(b.cat.category));
-  }
-
-  for (const f of filtered) {
-    const active = activeButtonCats.has(f.idx) ? ' active' : '';
-    const liked = likedButtonCats.has(f.idx) ? ' set-liked' : '';
-    html += `<div class="set-item${active}" onclick="loadButtonCat(${f.idx})">
+  let html = '';
+  for (const g of filtered) {
+    const firstIdx = g.indices[0];
+    const active = g.indices.some(i => activeButtonCats.has(i)) ? ' active' : '';
+    const liked = g.indices.some(i => likedButtonCats.has(i)) ? ' set-liked' : '';
+    html += `<div class="set-item${active}" onclick="loadButtonCatGroup('${g.name}')">
       <div class="dot"></div>
-      <div class="set-info"><div class="set-name">${f.cat.category}</div></div>
-      <div class="set-count">${f.count}</div>
+      <div class="set-info"><div class="set-name">${g.name}</div></div>
+      <div class="set-count">${g.count}</div>
       <div class="set-rate">
-        <button class="${liked ? 'set-liked' : ''}" onclick="event.stopPropagation();rateButtonCat(${f.idx},'minus')" title="Hide category">&minus;</button>
-        <button class="${liked}" onclick="event.stopPropagation();rateButtonCat(${f.idx},'plus')" title="${liked ? 'Unlike' : 'Like'}">&plus;</button>
+        <button class="${liked ? 'set-liked' : ''}" onclick="event.stopPropagation();rateButtonCatGroup('${g.name}','minus')">&minus;</button>
+        <button class="${liked}" onclick="event.stopPropagation();rateButtonCatGroup('${g.name}','plus')">&plus;</button>
       </div>
     </div>`;
   }
   el.innerHTML = html;
-  // Update search placeholder and show shared controls
   document.getElementById('searchInput').placeholder = 'Search buttons...';
   renderControls('buttons');
 }
@@ -962,6 +963,43 @@ function renderControls(mode) {
   if (tbAll) tbAll.classList.toggle('active', activeFilter === null);
   if (tbLiked) tbLiked.classList.toggle('active', activeFilter === 'liked');
   el.innerHTML = html;
+}
+
+function getIndicesForCatName(name) {
+  const indices = [];
+  BUTTON_CATALOG.forEach((cat, i) => { if (cat.category === name) indices.push(i); });
+  return indices;
+}
+
+function loadButtonCatGroup(name) {
+  const indices = getIndicesForCatName(name);
+  const allMatch = indices.length > 0 && indices.every(i => activeButtonCats.has(i));
+  if (allMatch) {
+    activeButtonCats.clear();
+  } else {
+    activeButtonCats.clear();
+    indices.forEach(i => activeButtonCats.add(i));
+  }
+  buttonSingleIndex = 0;
+  renderSidebar();
+  renderCanvas();
+  saveState();
+}
+
+function rateButtonCatGroup(name, action) {
+  const indices = getIndicesForCatName(name);
+  for (const idx of indices) {
+    if (action === 'plus') {
+      hiddenButtonCats.delete(idx);
+      if (likedButtonCats.has(idx)) likedButtonCats.delete(idx);
+      else likedButtonCats.add(idx);
+    } else {
+      if (likedButtonCats.has(idx)) likedButtonCats.delete(idx);
+      else hiddenButtonCats.add(idx);
+    }
+  }
+  renderSidebar();
+  saveState();
 }
 
 function loadButtonCat(idx) {
@@ -1130,7 +1168,7 @@ const BUTTON_CATALOG = [
     B('Indigo','background:#303f9f;color:#fff;border:none;border-radius:4px'),
     B('Pink','background:#c2185b;color:#fff;border:none;border-radius:4px'),
   ]},
-  { category: 'Outlined', buttons: [
+  { category: 'Outlined Variants', buttons: [
     B('Primary','background:transparent;color:#1976d2;border:2px solid #1976d2;border-radius:4px'),
     B('Success','background:transparent;color:#2e7d32;border:2px solid #2e7d32;border-radius:4px'),
     B('Danger','background:transparent;color:#d32f2f;border:2px solid #d32f2f;border-radius:4px'),
@@ -1196,7 +1234,7 @@ const BUTTON_CATALOG = [
     B('Candy','background:linear-gradient(135deg,#a8ff78,#78ffd6);color:#333;border:none;border-radius:6px'),
     B('Mango','background:linear-gradient(135deg,#ffe259,#ffa751);color:#333;border:none;border-radius:6px'),
   ]},
-  { category: 'Gradient Border', buttons: [
+  { category: 'Gradients', buttons: [
     B('Blue-Teal','background:linear-gradient(#fff,#fff) padding-box,linear-gradient(135deg,#667eea,#0369a1) border-box;color:#667eea;border:2px solid transparent;border-radius:6px'),
     B('Sunset','background:linear-gradient(#fff,#fff) padding-box,linear-gradient(135deg,#f093fb,#f5576c) border-box;color:#f5576c;border:2px solid transparent;border-radius:6px'),
     B('Ocean','background:linear-gradient(#fff,#fff) padding-box,linear-gradient(135deg,#4facfe,#00f2fe) border-box;color:#4facfe;border:2px solid transparent;border-radius:6px'),
@@ -1256,7 +1294,7 @@ const BUTTON_CATALOG = [
     B('Glossy','background:linear-gradient(180deg,rgba(255,255,255,0.4) 0%,rgba(255,255,255,0) 50%,rgba(0,0,0,0.1) 51%,rgba(0,0,0,0) 100%),#1976d2;color:#fff;border:1px solid #0d47a1;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.3)'),
     B('Gold','background:linear-gradient(180deg,#ffd700,#b8860b);color:#333;border:1px solid #8b6914;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.4);text-shadow:0 1px 0 rgba(255,255,255,0.3)'),
   ]},
-  { category: 'Retro / Pixel', buttons: [
+  { category: 'Retro Computing', buttons: [
     B('Win95','background:#c0c0c0;color:#000;border:none;border-radius:0;box-shadow:inset -2px -2px 0 #808080,inset 2px 2px 0 #fff;font-family:monospace'),
     B('DOS Blue','background:#0000aa;color:#fff;border:none;border-radius:0;box-shadow:inset -2px -2px 0 #000055,inset 2px 2px 0 #5555ff;font-family:monospace'),
     B('DOS Green','background:#008000;color:#fff;border:none;border-radius:0;box-shadow:inset -2px -2px 0 #004000,inset 2px 2px 0 #00ff00;font-family:monospace'),
@@ -1264,7 +1302,7 @@ const BUTTON_CATALOG = [
     B('Terminal','background:#000;color:#0f0;border:1px solid #0f0;border-radius:0;font-family:monospace;text-shadow:0 0 5px #0f0'),
     B('Amber CRT','background:#000;color:#ffb000;border:1px solid #ffb000;border-radius:0;font-family:monospace;text-shadow:0 0 5px #ffb000'),
   ]},
-  { category: 'Dashed / Dotted', buttons: [
+  { category: 'Outlined Variants', buttons: [
     B('Dashed','background:transparent;color:#666;border:2px dashed #999;border-radius:6px'),
     B('Dashed Blue','background:transparent;color:#1976d2;border:2px dashed #1976d2;border-radius:6px'),
     B('Dotted','background:transparent;color:#666;border:2px dotted #999;border-radius:6px'),
@@ -1291,7 +1329,7 @@ const BUTTON_CATALOG = [
     B('Spotify','background:#1db954;color:#fff;border:none;border-radius:9999px;font-weight:600'),
     B('Twitch','background:#9146ff;color:#fff;border:none;border-radius:4px;font-weight:600'),
   ]},
-  { category: 'Chips / Tags', buttons: [
+  { category: 'Badges & Tags', buttons: [
     B('Filled','background:#e0e0e0;color:#333;border:none;border-radius:16px;padding:6px 16px;font-size:12px'),
     B('Outlined','background:transparent;color:#666;border:1px solid #ccc;border-radius:16px;padding:6px 16px;font-size:12px'),
     B('Active','background:#1976d2;color:#fff;border:none;border-radius:16px;padding:6px 16px;font-size:12px'),
@@ -1300,7 +1338,7 @@ const BUTTON_CATALOG = [
     B('Success','background:rgba(46,125,50,0.12);color:#2e7d32;border:none;border-radius:16px;padding:6px 16px;font-size:12px'),
     B('Removable ×','background:#e0e0e0;color:#333;border:none;border-radius:16px;padding:6px 16px;font-size:12px'),
   ]},
-  { category: 'Animated Pulse', buttons: [
+  { category: 'Animated', buttons: [
     B('Pulse Blue','background:#1976d2;color:#fff;border:none;border-radius:4px;animation:btn-pulse 2s infinite;--pulse-color:rgba(25,118,210,0.5)'),
     B('Pulse Green','background:#2e7d32;color:#fff;border:none;border-radius:4px;animation:btn-pulse 2s infinite;--pulse-color:rgba(46,125,50,0.5)'),
     B('Pulse Red','background:#d32f2f;color:#fff;border:none;border-radius:4px;animation:btn-pulse 2s infinite;--pulse-color:rgba(211,47,47,0.5)'),
@@ -1339,7 +1377,7 @@ const BUTTON_CATALOG = [
     B('Outline Black','background:transparent;color:#000;border:2px solid #000;border-radius:4px'),
     B('Outline Gray','background:transparent;color:#888;border:2px solid #888;border-radius:4px'),
   ]},
-  { category: 'High Contrast', buttons: [
+  { category: 'Accessibility', buttons: [
     B('Black/Yellow','background:#000;color:#ffff00;border:2px solid #ffff00;border-radius:4px;padding:12px 24px;font-size:15px;font-weight:700'),
     B('White/Blue','background:#003087;color:#fff;border:none;border-radius:4px;padding:12px 24px;font-size:15px;font-weight:700'),
     B('Large Target','background:#1976d2;color:#fff;border:none;border-radius:8px;padding:16px 32px;font-size:18px'),
@@ -1374,7 +1412,7 @@ const BUTTON_CATALOG = [
     B('Skeleton Pill','background:linear-gradient(90deg,#e0e0e0 25%,#f0f0f0 50%,#e0e0e0 75%);background-size:200% 100%;color:transparent;border:none;border-radius:9999px;width:100px;animation:btn-skeleton 1.5s infinite'),
     B('Skeleton Circle','background:linear-gradient(90deg,#e0e0e0 25%,#f0f0f0 50%,#e0e0e0 75%);background-size:200% 100%;color:transparent;border:none;border-radius:50%;width:48px;height:48px;animation:btn-skeleton 1.5s infinite;padding:0'),
   ]},
-  { category: 'Shadow Pop', buttons: [
+  { category: 'Shadow Techniques', buttons: [
     B('Black','background:#111;color:#fff;border:none;border-radius:4px;box-shadow:5px 5px 0 #888'),
     B('Blue','background:#1976d2;color:#fff;border:none;border-radius:4px;box-shadow:5px 5px 0 #0d47a1'),
     B('Red','background:#d32f2f;color:#fff;border:none;border-radius:4px;box-shadow:5px 5px 0 #8b0000'),
@@ -1437,7 +1475,7 @@ const BUTTON_CATALOG = [
     B('VHS Static','background:repeating-linear-gradient(0deg,rgba(255,113,206,0.15) 0px,rgba(255,113,206,0.15) 1px,transparent 1px,transparent 4px),linear-gradient(135deg,#1a0030,#08005d);color:#ff71ce;border:1px solid #ff71ce;border-radius:0;font-family:monospace;font-weight:700;letter-spacing:2px;text-transform:uppercase'),
     B('Holographic','background:linear-gradient(135deg,#ff71ce,#b967ff,#05ffa1,#01cdfe,#ff71ce);background-size:300% 300%;color:#fff;border:none;border-radius:4px;font-weight:700;letter-spacing:1px;animation:btn-rainbow 6s linear infinite'),
   ]},
-  { category: 'Art Deco', buttons: [
+  { category: 'Art Movements', buttons: [
     B('Gold Deco','background:linear-gradient(180deg,#f5d67a,#c8a84b);color:#1a0a00;border:2px solid #c8a84b;border-radius:0;font-weight:700;letter-spacing:4px;text-transform:uppercase;font-size:11px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.3),0 2px 8px rgba(0,0,0,0.3)'),
     B('Art Noir','background:#1a1209;color:#d4a843;border:1px solid #d4a843;border-radius:0;font-weight:700;letter-spacing:3px;text-transform:uppercase;font-size:11px;box-shadow:inset 0 0 0 3px rgba(212,168,67,0.2)'),
     B('Ivory','background:linear-gradient(180deg,#fdf6e3,#f5e6c8);color:#5c3317;border:2px solid #c9a96e;border-radius:0;font-weight:600;letter-spacing:3px;text-transform:uppercase;font-size:11px'),
@@ -1446,7 +1484,7 @@ const BUTTON_CATALOG = [
     B('Black & Gold','background:#000;color:#d4a843;border:1px solid #d4a843;border-radius:0;font-weight:700;letter-spacing:4px;text-transform:uppercase;font-size:11px;box-shadow:inset 0 0 0 2px rgba(212,168,67,0.3)'),
     B('Pearl','background:linear-gradient(135deg,#f8f0ff,#e8d5f5);color:#4a1060;border:2px solid #0d9488;border-radius:0;font-weight:700;letter-spacing:3px;text-transform:uppercase;font-size:11px'),
   ]},
-  { category: 'Memphis Design', buttons: [
+  { category: 'Art Movements', buttons: [
     B('Squiggle','background:#fff;color:#000;border:3px solid #000;border-radius:4px;font-weight:700;background-image:radial-gradient(circle,#ff4757 2px,transparent 2px),radial-gradient(circle,#2ed573 2px,transparent 2px);background-size:20px 20px;background-position:0 0,10px 10px'),
     B('Zigzag','background:linear-gradient(135deg,#fdcb6e,#e17055,#d63031,#0891b2);color:#fff;border:3px solid #000;border-radius:0;font-weight:900;letter-spacing:1px'),
     B('Polka','background:#e84393;color:#fff;border:3px solid #000;border-radius:0;font-weight:700;box-shadow:5px 5px 0 #00b894'),
@@ -1492,7 +1530,7 @@ const BUTTON_CATALOG = [
     B('Wildflower','background:linear-gradient(135deg,#f9a8d4,#fcd34d,#86efac);color:#1a1a1a;border:none;border-radius:20px 4px 20px 4px;font-weight:600;font-style:italic'),
     B('Linen','background:#faf0e6;color:#5c3317;border:2px solid #c9a96e;border-radius:4px;font-weight:500;letter-spacing:1px;box-shadow:inset 0 0 0 1px rgba(201,169,110,0.3)'),
   ]},
-  { category: 'Healthcare', buttons: [
+  { category: 'Industry', buttons: [
     B('Emergency','background:#cc0000;color:#fff;border:none;border-radius:4px;font-weight:700;font-size:14px;letter-spacing:0.5px'),
     B('Consult','background:#0077b6;color:#fff;border:none;border-radius:6px;font-weight:600'),
     B('Appointment','background:#fff;color:#0077b6;border:2px solid #0077b6;border-radius:6px;font-weight:600'),
@@ -1504,7 +1542,7 @@ const BUTTON_CATALOG = [
     B('ICU Alert','background:#fff;color:#cc0000;border:3px solid #cc0000;border-radius:2px;font-weight:900;font-size:13px;text-transform:uppercase;letter-spacing:1px;animation:btn-pulse 2s infinite;--pulse-color:rgba(204,0,0,0.4)'),
     B('Telehealth','background:linear-gradient(135deg,#0077b6,#48cae4);color:#fff;border:none;border-radius:8px;font-weight:600'),
   ]},
-  { category: 'Finance', buttons: [
+  { category: 'Industry', buttons: [
     B('Invest','background:#1a1a2e;color:#00d4aa;border:none;border-radius:4px;font-weight:700;letter-spacing:0.5px'),
     B('Transfer','background:#0070ba;color:#fff;border:none;border-radius:6px;font-weight:600'),
     B('Pay Now','background:linear-gradient(135deg,#00b09b,#96c93d);color:#fff;border:none;border-radius:6px;font-weight:700'),
@@ -1528,7 +1566,7 @@ const BUTTON_CATALOG = [
     B('GG EZ','background:linear-gradient(135deg,#2d0b54,#6a11cb);color:#fff;border:none;border-radius:50px;font-weight:700;text-transform:uppercase;letter-spacing:2px;padding:8px 24px'),
     B('XP +100','background:linear-gradient(135deg,#f7971e,#ffd200);color:#1a0a00;border:3px solid #fff;border-radius:6px;font-weight:900;font-size:12px;text-transform:uppercase;box-shadow:0 0 10px rgba(255,210,0,0.5)'),
   ]},
-  { category: 'Education', buttons: [
+  { category: 'Industry', buttons: [
     B('Enroll','background:#4361ee;color:#fff;border:none;border-radius:6px;font-weight:600'),
     B('Start Lesson','background:linear-gradient(135deg,#4361ee,#3a0ca3);color:#fff;border:none;border-radius:8px;font-weight:700;box-shadow:0 4px 12px rgba(67,97,238,0.35)'),
     B('Quiz','background:#f9c74f;color:#333;border:none;border-radius:6px;font-weight:700'),
@@ -1539,7 +1577,7 @@ const BUTTON_CATALOG = [
     B('Practice','background:#e9ecef;color:#495057;border:none;border-radius:6px;font-weight:600'),
     B('Ask AI','background:linear-gradient(135deg,#4cc9f0,#4361ee);color:#fff;border:none;border-radius:8px;font-weight:600'),
   ]},
-  { category: 'Real Estate', buttons: [
+  { category: 'Industry', buttons: [
     B('Schedule Tour','background:#1a3c5e;color:#fff;border:none;border-radius:4px;font-weight:600'),
     B('Contact Agent','background:transparent;color:#1a3c5e;border:2px solid #1a3c5e;border-radius:4px;font-weight:600'),
     B('Save Home ♥','background:transparent;color:#e11d48;border:2px solid #e11d48;border-radius:9999px;padding:8px 24px'),
@@ -1549,7 +1587,7 @@ const BUTTON_CATALOG = [
     B('Make Offer','background:#27ae60;color:#fff;border:none;border-radius:6px;font-weight:700;font-size:14px;padding:12px 28px'),
     B('Pre-Approved','background:#f8f9fa;color:#6c757d;border:1px solid #ced4da;border-radius:4px;font-weight:500'),
   ]},
-  { category: 'Travel', buttons: [
+  { category: 'Industry', buttons: [
     B('Book Flight','background:linear-gradient(135deg,#00b4d8,#0077b6);color:#fff;border:none;border-radius:8px;font-weight:700;box-shadow:0 4px 12px rgba(0,119,182,0.3)'),
     B('Hotels','background:#e63946;color:#fff;border:none;border-radius:6px;font-weight:600'),
     B('Explore','background:linear-gradient(135deg,#f77f00,#d62828);color:#fff;border:none;border-radius:50px;font-weight:700;padding:10px 28px'),
@@ -1560,7 +1598,7 @@ const BUTTON_CATALOG = [
     B('Car Rental','background:#4361ee;color:#fff;border:none;border-radius:6px;font-weight:600'),
     B('Passport','background:#003087;color:#fff;border:none;border-radius:4px;font-weight:600;letter-spacing:0.5px'),
   ]},
-  { category: 'Food & Restaurant', buttons: [
+  { category: 'Industry', buttons: [
     B('Order Now','background:#e63946;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:14px;box-shadow:0 4px 12px rgba(230,57,70,0.3)'),
     B('Add to Order','background:#2a9d8f;color:#fff;border:none;border-radius:6px;font-weight:600'),
     B('Reserve Table','background:#264653;color:#fff;border:none;border-radius:4px;font-weight:600;letter-spacing:0.5px'),
@@ -1571,7 +1609,7 @@ const BUTTON_CATALOG = [
     B('View Recipe','background:#f9c74f;color:#333;border:none;border-radius:6px;font-weight:600'),
     B('Customise','background:#fff;color:#e63946;border:2px solid #e63946;border-radius:6px;font-weight:600'),
   ]},
-  { category: 'Long Shadow', buttons: [
+  { category: 'Shadow Techniques', buttons: [
     B('Blue','background:#1976d2;color:#fff;border:none;border-radius:4px;box-shadow:1px 1px 0 #0d47a1,2px 2px 0 #0d47a1,3px 3px 0 #0d47a1,4px 4px 0 #0d47a1,5px 5px 0 #0d47a1,6px 6px 0 #0d47a1,7px 7px 0 #0d47a1,8px 8px 0 #0d47a1'),
     B('Green','background:#2e7d32;color:#fff;border:none;border-radius:4px;box-shadow:1px 1px 0 #1b5e20,2px 2px 0 #1b5e20,3px 3px 0 #1b5e20,4px 4px 0 #1b5e20,5px 5px 0 #1b5e20,6px 6px 0 #1b5e20,7px 7px 0 #1b5e20,8px 8px 0 #1b5e20'),
     B('Red','background:#d32f2f;color:#fff;border:none;border-radius:4px;box-shadow:1px 1px 0 #8b0000,2px 2px 0 #8b0000,3px 3px 0 #8b0000,4px 4px 0 #8b0000,5px 5px 0 #8b0000,6px 6px 0 #8b0000,7px 7px 0 #8b0000,8px 8px 0 #8b0000'),
@@ -1579,7 +1617,7 @@ const BUTTON_CATALOG = [
     B('Orange','background:#e65100;color:#fff;border:none;border-radius:4px;box-shadow:1px 1px 0 #bf360c,2px 2px 0 #bf360c,3px 3px 0 #bf360c,4px 4px 0 #bf360c,5px 5px 0 #bf360c,6px 6px 0 #bf360c,7px 7px 0 #bf360c'),
     B('Pill Long','background:#1976d2;color:#fff;border:none;border-radius:9999px;padding:8px 28px;box-shadow:1px 1px 0 #0d47a1,2px 2px 0 #0d47a1,3px 3px 0 #0d47a1,4px 4px 0 #0d47a1,5px 5px 0 #0d47a1,6px 6px 0 #0d47a1'),
   ]},
-  { category: 'Colored Shadow', buttons: [
+  { category: 'Shadow Techniques', buttons: [
     B('Blue Glow','background:#1976d2;color:#fff;border:none;border-radius:8px;box-shadow:0 8px 25px rgba(25,118,210,0.5)'),
     B('Red Glow','background:#d32f2f;color:#fff;border:none;border-radius:8px;box-shadow:0 8px 25px rgba(211,47,47,0.5)'),
     B('Green Glow','background:#2e7d32;color:#fff;border:none;border-radius:8px;box-shadow:0 8px 25px rgba(46,125,50,0.5)'),
@@ -1590,7 +1628,7 @@ const BUTTON_CATALOG = [
     B('Layered','background:#1976d2;color:#fff;border:none;border-radius:8px;box-shadow:0 4px 6px rgba(25,118,210,0.2),0 10px 15px rgba(25,118,210,0.3),0 20px 30px rgba(25,118,210,0.15)'),
     B('Offset','background:#fff;color:#1976d2;border:2px solid #1976d2;border-radius:6px;box-shadow:4px 4px 0 #1976d2'),
   ]},
-  { category: 'Inner Shadow', buttons: [
+  { category: 'Shadow Techniques', buttons: [
     B('Pressed Blue','background:#1976d2;color:#fff;border:none;border-radius:6px;box-shadow:inset 0 3px 6px rgba(0,0,0,0.3),inset 0 1px 2px rgba(0,0,0,0.2)'),
     B('Pressed Gray','background:#e0e0e0;color:#555;border:none;border-radius:6px;box-shadow:inset 0 3px 6px rgba(0,0,0,0.15),inset 0 1px 2px rgba(0,0,0,0.1)'),
     B('Inset Dark','background:#1a1a2e;color:#fff;border:none;border-radius:6px;box-shadow:inset 0 4px 8px rgba(0,0,0,0.5),inset 0 -1px 0 rgba(255,255,255,0.05)'),
@@ -1598,7 +1636,7 @@ const BUTTON_CATALOG = [
     B('Concave','background:linear-gradient(180deg,#d0d0d0,#f0f0f0);color:#555;border:1px solid #bbb;border-radius:6px;box-shadow:inset 0 2px 4px rgba(0,0,0,0.15),0 1px 0 rgba(255,255,255,0.7)'),
     B('Well','background:#c8c8c8;color:#444;border:none;border-radius:8px;box-shadow:inset 2px 2px 5px rgba(0,0,0,0.2),inset -2px -2px 5px rgba(255,255,255,0.7)'),
   ]},
-  { category: 'Double Border', buttons: [
+  { category: 'Outlined Variants', buttons: [
     B('Classic','background:#fff;color:#1976d2;border:3px solid #1976d2;border-radius:0;outline:2px solid #1976d2;outline-offset:3px'),
     B('Pill Double','background:#fff;color:#0e7490;border:2px solid #0e7490;border-radius:9999px;padding:8px 28px;outline:2px solid #0e7490;outline-offset:3px'),
     B('Dark Double','background:#000;color:#fff;border:2px solid #fff;border-radius:0;outline:2px solid #fff;outline-offset:4px'),
@@ -1607,7 +1645,7 @@ const BUTTON_CATALOG = [
     B('Gold Frame','background:linear-gradient(#fff,#fff) padding-box,linear-gradient(135deg,#f5d67a,#c8a84b,#f5d67a) border-box;color:#8b6914;border:3px solid transparent;border-radius:4px;box-shadow:0 0 0 1px rgba(200,168,75,0.3)'),
     B('Rounded Inset','background:#2e7d32;color:#fff;border:3px solid rgba(255,255,255,0.5);border-radius:12px;box-shadow:0 0 0 3px #2e7d32'),
   ]},
-  { category: 'Parallelogram / Skewed', buttons: [
+  { category: 'Shapes & Geometry', buttons: [
     B('Blue Slant','background:#1976d2;color:#fff;border:none;border-radius:0;clip-path:polygon(12px 0%,100% 0%,calc(100% - 12px) 100%,0% 100%);padding:10px 32px'),
     B('Dark Slant','background:#212529;color:#fff;border:none;border-radius:0;clip-path:polygon(12px 0%,100% 0%,calc(100% - 12px) 100%,0% 100%);padding:10px 32px'),
     B('Red Skew','background:#d32f2f;color:#fff;border:none;border-radius:0;transform:skewX(-12deg);padding:10px 32px'),
@@ -1616,7 +1654,7 @@ const BUTTON_CATALOG = [
     B('Arrow Right','background:#2e7d32;color:#fff;border:none;border-radius:0;clip-path:polygon(0% 0%,calc(100% - 16px) 0%,100% 50%,calc(100% - 16px) 100%,0% 100%);padding:10px 36px 10px 20px'),
     B('Arrow Left','background:#0288d1;color:#fff;border:none;border-radius:0;clip-path:polygon(16px 0%,100% 0%,100% 100%,16px 100%,0% 50%);padding:10px 20px 10px 36px'),
   ]},
-  { category: 'Hexagonal & Polygon', buttons: [
+  { category: 'Shapes & Geometry', buttons: [
     B('Hexagon','background:#1976d2;color:#fff;border:none;border-radius:0;clip-path:polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%);width:100px;height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center'),
     B('Pentagon','background:#0e7490;color:#fff;border:none;border-radius:0;clip-path:polygon(50% 0%,100% 38%,82% 100%,18% 100%,0% 38%);width:80px;height:60px;padding:0;display:inline-flex;align-items:center;justify-content:center'),
     B('Octagon','background:#2e7d32;color:#fff;border:none;border-radius:0;clip-path:polygon(30% 0%,70% 0%,100% 30%,100% 70%,70% 100%,30% 100%,0% 70%,0% 30%);width:70px;height:70px;padding:0;display:inline-flex;align-items:center;justify-content:center'),
@@ -1624,7 +1662,7 @@ const BUTTON_CATALOG = [
     B('Star','background:#fdd835;color:#333;border:none;border-radius:0;clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);width:70px;height:70px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:10px'),
     B('Diamond','background:linear-gradient(135deg,#667eea,#0369a1);color:#fff;border:none;border-radius:0;clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);width:80px;height:80px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:11px'),
   ]},
-  { category: 'Blob / Organic', buttons: [
+  { category: 'Shapes & Geometry', buttons: [
     B('Blob 1','background:#1976d2;color:#fff;border:none;border-radius:60% 40% 30% 70% / 60% 30% 70% 40%;padding:14px 28px;font-weight:700'),
     B('Blob 2','background:#0e7490;color:#fff;border:none;border-radius:30% 70% 70% 30% / 30% 30% 70% 70%;padding:14px 28px;font-weight:700'),
     B('Blob 3','background:#2e7d32;color:#fff;border:none;border-radius:50% 20% 50% 20% / 20% 50% 20% 50%;padding:14px 28px;font-weight:700'),
@@ -1632,7 +1670,7 @@ const BUTTON_CATALOG = [
     B('Wiggle','background:#e65100;color:#fff;border:none;border-radius:40% 60% 60% 40% / 40% 40% 60% 60%;padding:14px 28px;font-weight:700'),
     B('Amorphous','background:linear-gradient(135deg,#43e97b,#38f9d7);color:#1a5e20;border:none;border-radius:45% 55% 40% 60% / 55% 45% 55% 45%;padding:14px 28px;font-weight:700'),
   ]},
-  { category: 'Metal / Texture', buttons: [
+  { category: 'Textures', buttons: [
     B('Steel','background:linear-gradient(180deg,#e8e8e8 0%,#c0c0c0 20%,#f0f0f0 50%,#a8a8a8 80%,#d0d0d0 100%);color:#333;border:1px solid #999;border-radius:4px;font-weight:700;text-shadow:0 1px 0 rgba(255,255,255,0.6);box-shadow:inset 0 1px 0 rgba(255,255,255,0.6),0 2px 4px rgba(0,0,0,0.3)'),
     B('Brushed','background:repeating-linear-gradient(90deg,rgba(255,255,255,0.03) 0px,rgba(255,255,255,0.03) 1px,transparent 1px,transparent 3px),linear-gradient(180deg,#9e9e9e,#757575);color:#fff;border:1px solid #555;border-radius:2px;font-weight:700;text-shadow:0 -1px 0 rgba(0,0,0,0.4);box-shadow:inset 0 1px 0 rgba(255,255,255,0.2),0 2px 4px rgba(0,0,0,0.4)'),
     B('Copper','background:linear-gradient(135deg,#b87333,#da8a67,#b87333,#8b5e3c);background-size:200%;color:#fff;border:1px solid #8b5e3c;border-radius:4px;font-weight:700;text-shadow:0 -1px 0 rgba(0,0,0,0.3);box-shadow:inset 0 1px 0 rgba(255,255,255,0.3),0 2px 6px rgba(0,0,0,0.4)'),
@@ -1641,7 +1679,7 @@ const BUTTON_CATALOG = [
     B('Iron','background:linear-gradient(180deg,#555,#333,#555);color:#eee;border:1px solid #222;border-radius:2px;font-weight:700;text-shadow:0 -1px 0 rgba(0,0,0,0.5);box-shadow:inset 0 1px 0 rgba(255,255,255,0.15),0 2px 6px rgba(0,0,0,0.6)'),
     B('Platinum','background:linear-gradient(135deg,#e0e0e8,#b0b0c0,#e8e8f0,#a0a0b0);color:#333;border:1px solid #9090a0;border-radius:6px;font-weight:700;text-shadow:0 1px 0 rgba(255,255,255,0.7);box-shadow:inset 0 1px 0 rgba(255,255,255,0.6),0 2px 8px rgba(0,0,0,0.3)'),
   ]},
-  { category: 'Paper / Organic Texture', buttons: [
+  { category: 'Textures', buttons: [
     B('Parchment','background:linear-gradient(135deg,#fdf3e3,#f5e6c8,#fdf3e3);color:#5c3317;border:1px solid #c9a96e;border-radius:4px;font-weight:500;font-family:georgia,serif;box-shadow:inset 0 0 20px rgba(0,0,0,0.05),0 2px 4px rgba(0,0,0,0.15)'),
     B('Newsprint','background:#f5f0e8;color:#2a2418;border:1px solid #c0b090;border-radius:0;font-family:times,serif;font-size:14px;box-shadow:inset 0 0 30px rgba(0,0,0,0.08)'),
     B('Kraft Paper','background:linear-gradient(135deg,#c4a26b,#a8834e);color:#fff;border:none;border-radius:2px;font-weight:600;box-shadow:inset 0 1px 0 rgba(255,255,255,0.2),0 2px 4px rgba(0,0,0,0.3)'),
@@ -1676,7 +1714,7 @@ const BUTTON_CATALOG = [
     B('Dark + ▼','background:#212529;color:#fff;border:none;border-radius:4px 0 0 4px;border-right:1px solid rgba(255,255,255,0.2);font-weight:600'),
     B('▼','background:#000;color:#fff;border:none;border-radius:0 4px 4px 0;padding:8px 12px;font-size:12px'),
   ]},
-  { category: 'Badge Button', buttons: [
+  { category: 'Badges & Tags', buttons: [
     B('Notif 3','background:#1976d2;color:#fff;border:none;border-radius:6px;font-weight:600;position:relative;box-shadow:0 0 0 0 transparent'),
     B('Alert ●','background:#fff;color:#333;border:1px solid #ddd;border-radius:6px;font-weight:500;box-shadow:0 2px 4px rgba(0,0,0,0.1)'),
     B('NEW Badge','background:#2e7d32;color:#fff;border:none;border-radius:6px;font-weight:600;outline:3px solid #4caf50;outline-offset:2px'),
@@ -1694,7 +1732,7 @@ const BUTTON_CATALOG = [
     B('Share','background:#0e7490;color:#fff;border:none;border-radius:50%;width:48px;height:48px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 3px 10px rgba(123,31,162,0.4)'),
     B('+ Small FAB','background:#2e7d32;color:#fff;border:none;border-radius:50%;width:40px;height:40px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 3px 10px rgba(46,125,50,0.4)'),
   ]},
-  { category: 'Material Design 3', buttons: [
+  { category: 'Design Systems', buttons: [
     B('MD3 Filled','background:#0b57d0;color:#fff;border:none;border-radius:20px;padding:10px 24px;font-weight:500;letter-spacing:0.1px'),
     B('MD3 Tonal','background:#d3e3fd;color:#041e49;border:none;border-radius:20px;padding:10px 24px;font-weight:500'),
     B('MD3 Outlined','background:transparent;color:#0b57d0;border:1px solid #79747e;border-radius:20px;padding:10px 24px;font-weight:500'),
@@ -1704,7 +1742,7 @@ const BUTTON_CATALOG = [
     B('MD3 Extended FAB','background:#d3e3fd;color:#041e49;border:none;border-radius:16px;padding:16px 20px;font-weight:500;box-shadow:0 1px 3px 1px rgba(0,0,0,0.15),0 1px 2px rgba(0,0,0,0.3)'),
     B('MD3 Primary Tonal','background:#d3e3fd;color:#041e49;border:none;border-radius:20px;padding:10px 24px;font-weight:500;letter-spacing:0.1px;box-shadow:0 1px 2px rgba(0,0,0,0.3)'),
   ]},
-  { category: 'Fluent UI / Windows', buttons: [
+  { category: 'Design Systems', buttons: [
     B('Primary','background:#0078d4;color:#fff;border:none;border-radius:4px;font-weight:600;font-family:system-ui'),
     B('Default','background:#fff;color:#323130;border:1px solid #8a8886;border-radius:4px;font-weight:400;font-family:system-ui'),
     B('Compound','background:#fff;color:#0078d4;border:1px solid #0078d4;border-radius:4px;font-weight:600;padding:12px 20px;font-family:system-ui'),
@@ -1714,7 +1752,7 @@ const BUTTON_CATALOG = [
     B('Command Bar','background:#f3f2f1;color:#323130;border:none;border-radius:2px;font-size:12px;padding:6px 16px;font-family:system-ui'),
     B('Toggle','background:#0078d4;color:#fff;border:none;border-radius:4px;font-weight:600;box-shadow:inset 0 -3px 0 rgba(0,0,0,0.2);font-family:system-ui'),
   ]},
-  { category: 'Apple HIG Style', buttons: [
+  { category: 'Design Systems', buttons: [
     B('System Blue','background:#007aff;color:#fff;border:none;border-radius:10px;font-weight:600;font-family:-apple-system'),
     B('System Gray','background:#8e8e93;color:#fff;border:none;border-radius:10px;font-weight:600;font-family:-apple-system'),
     B('System Red','background:#ff3b30;color:#fff;border:none;border-radius:10px;font-weight:600;font-family:-apple-system'),
@@ -1725,7 +1763,7 @@ const BUTTON_CATALOG = [
     B('Destructive','background:#ff3b30;color:#fff;border:none;border-radius:10px;font-weight:600;font-family:-apple-system'),
     B('Plain','background:transparent;color:#007aff;border:none;border-radius:10px;font-weight:400;font-family:-apple-system'),
   ]},
-  { category: 'Ant Design Style', buttons: [
+  { category: 'Design Systems', buttons: [
     B('Primary','background:#1677ff;color:#fff;border:none;border-radius:6px;font-weight:400;box-shadow:0 2px 0 rgba(5,145,255,0.1)'),
     B('Default','background:#fff;color:#000000e0;border:1px solid #d9d9d9;border-radius:6px;font-weight:400;box-shadow:0 2px 0 rgba(0,0,0,0.02)'),
     B('Dashed','background:#fff;color:#000000e0;border:1px dashed #d9d9d9;border-radius:6px;font-weight:400'),
@@ -1735,7 +1773,7 @@ const BUTTON_CATALOG = [
     B('Ghost','background:transparent;color:#fff;border:1px solid #fff;border-radius:6px;font-weight:400'),
     B('Round','background:#1677ff;color:#fff;border:none;border-radius:9999px;font-weight:400;padding:6px 24px'),
   ]},
-  { category: 'Tailwind / Utility Patterns', buttons: [
+  { category: 'Design Systems', buttons: [
     B('Indigo-600','background:#4f46e5;color:#fff;border:none;border-radius:6px;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,0.05)'),
     B('Sky','background:#0ea5e9;color:#fff;border:none;border-radius:8px;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,0.1)'),
     B('Emerald','background:#10b981;color:#fff;border:none;border-radius:6px;font-weight:600'),
@@ -1747,7 +1785,7 @@ const BUTTON_CATALOG = [
     B('Violet Soft','background:#ede9fe;color:#5b21b6;border:none;border-radius:6px;font-weight:600'),
     B('Fuchsia','background:#d946ef;color:#fff;border:none;border-radius:6px;font-weight:600;box-shadow:0 2px 10px rgba(217,70,239,0.3)'),
   ]},
-  { category: 'Bootstrap Patterns', buttons: [
+  { category: 'Design Systems', buttons: [
     B('btn-primary','background:#0d6efd;color:#fff;border:1px solid #0d6efd;border-radius:6px;font-weight:400;font-size:16px;padding:6px 12px'),
     B('btn-secondary','background:#6c757d;color:#fff;border:1px solid #6c757d;border-radius:6px;font-weight:400;padding:6px 12px'),
     B('btn-outline-primary','background:transparent;color:#0d6efd;border:1px solid #0d6efd;border-radius:6px;font-weight:400;padding:6px 12px'),
@@ -1758,7 +1796,7 @@ const BUTTON_CATALOG = [
     B('btn-warning','background:#ffc107;color:#000;border:1px solid #ffc107;border-radius:6px;font-weight:400;padding:6px 12px'),
     B('btn-dark','background:#212529;color:#fff;border:1px solid #212529;border-radius:6px;font-weight:400;padding:6px 12px'),
   ]},
-  { category: 'Focus Ring Styles', buttons: [
+  { category: 'Accessibility', buttons: [
     B('Blue Ring','background:#1976d2;color:#fff;border:none;border-radius:4px;outline:3px solid rgba(25,118,210,0.5);outline-offset:2px'),
     B('Black Ring','background:#000;color:#fff;border:none;border-radius:4px;outline:3px solid rgba(0,0,0,0.5);outline-offset:2px'),
     B('White Ring','background:#1976d2;color:#fff;border:none;border-radius:4px;outline:3px solid #fff;outline-offset:2px;box-shadow:0 0 0 5px #1976d2'),
@@ -1767,7 +1805,7 @@ const BUTTON_CATALOG = [
     B('Pill Focus','background:#0e7490;color:#fff;border:none;border-radius:9999px;padding:8px 28px;outline:3px solid rgba(123,31,162,0.5);outline-offset:3px'),
     B('Skip Ring','background:#fff;color:#000;border:none;border-radius:0;outline:5px solid #000;outline-offset:0;font-weight:700;font-size:14px'),
   ]},
-  { category: 'Hover Transform', buttons: [
+  { category: 'Animated', buttons: [
     B('Lift','background:#1976d2;color:#fff;border:none;border-radius:6px;transition:transform 0.15s,box-shadow 0.15s'),
     B('Scale Up','background:#0e7490;color:#fff;border:none;border-radius:6px;transition:transform 0.15s'),
     B('Scale Down','background:#2e7d32;color:#fff;border:none;border-radius:6px;transition:transform 0.1s'),
@@ -1776,7 +1814,7 @@ const BUTTON_CATALOG = [
     B('Shake','background:#fdd835;color:#333;border:none;border-radius:6px;font-weight:700;animation:btn-breathe 0.5s infinite'),
     B('Pop','background:linear-gradient(135deg,#667eea,#0369a1);color:#fff;border:none;border-radius:50px;transition:transform 0.2s,box-shadow 0.2s'),
   ]},
-  { category: 'Animated Border', buttons: [
+  { category: 'Animated', buttons: [
     B('Spin Border','background:#fff;color:#1976d2;border:2px solid transparent;border-radius:4px;background-clip:padding-box;box-shadow:0 0 0 2px #1976d2;animation:btn-rainbow 3s linear infinite'),
     B('March Ants','background:#fff;color:#333;border:2px dashed #333;border-radius:4px;animation:btn-shimmer 2s linear infinite'),
     B('Gradient Spin','background:linear-gradient(#fff,#fff) padding-box,linear-gradient(var(--angle,0deg),#667eea,#0369a1,#f5576c,#667eea) border-box;color:#0369a1;border:2px solid transparent;border-radius:8px;animation:btn-rainbow 3s linear infinite'),
@@ -1790,7 +1828,7 @@ const BUTTON_CATALOG = [
     B('Grid Box','background:repeating-linear-gradient(0deg,rgba(0,0,255,0.05) 0px,rgba(0,0,255,0.05) 1px,transparent 1px,transparent 20px),repeating-linear-gradient(90deg,rgba(0,0,255,0.05) 0px,rgba(0,0,255,0.05) 1px,transparent 1px,transparent 20px),#fff;color:#0033cc;border:1px solid #0033cc;border-radius:0;font-family:monospace;font-size:11px;font-weight:700'),
     B('Prototype','background:#f5f5f5;color:#888;border:2px dashed #ccc;border-radius:4px;font-family:monospace;font-size:12px;font-style:italic'),
   ]},
-  { category: 'Dark Mode Native', buttons: [
+  { category: 'Inverse (on dark)', buttons: [
     B('Dark Primary','background:#90caf9;color:#0d47a1;border:none;border-radius:4px;font-weight:700'),
     B('Dark Secondary','background:#ce93d8;color:#0c4a6e;border:none;border-radius:4px;font-weight:700'),
     B('Dark Surface','background:#1e1e1e;color:#fff;border:1px solid #333;border-radius:4px'),
@@ -1814,14 +1852,14 @@ const BUTTON_CATALOG = [
     B('⬡ Deploy','background:#0e7490;color:#fff;border:none;border-radius:4px;font-weight:600'),
     B('✈ Launch','background:linear-gradient(135deg,#667eea,#0369a1);color:#fff;border:none;border-radius:8px;font-weight:600;box-shadow:0 4px 12px rgba(102,126,234,0.4)'),
   ]},
-  { category: 'Stacked / Layered', buttons: [
+  { category: 'Shadow Techniques', buttons: [
     B('Layer Blue','background:#1976d2;color:#fff;border:none;border-radius:4px;box-shadow:3px 3px 0 #0d47a1,6px 6px 0 rgba(13,71,161,0.3)'),
     B('Layer Green','background:#2e7d32;color:#fff;border:none;border-radius:4px;box-shadow:3px 3px 0 #1b5e20,6px 6px 0 rgba(27,94,32,0.3)'),
     B('Layer Red','background:#d32f2f;color:#fff;border:none;border-radius:4px;box-shadow:3px 3px 0 #8b0000,6px 6px 0 rgba(139,0,0,0.3)'),
     B('Rainbow Stack','background:#fff;color:#333;border:2px solid #000;border-radius:0;font-weight:700;box-shadow:4px 4px 0 #ff0000,6px 6px 0 #ffa500,8px 8px 0 #ffff00'),
     B('Pastel Stack','background:#fce4ec;color:#880e4f;border:2px solid #f48fb1;border-radius:8px;font-weight:600;box-shadow:4px 4px 0 #f48fb1,8px 8px 0 rgba(244,143,177,0.3)'),
     B('Offset Multi','background:#f5f5f5;color:#333;border:2px solid #bbb;border-radius:4px;font-weight:600;box-shadow:2px 2px 0 #ccc,4px 4px 0 #ddd,6px 6px 0 #eee'),
-  ]},  { category: 'Outlined Variants Extended', buttons: [
+  ]},  { category: 'Outlined Variants', buttons: [
     B('Thick 4px','background:transparent;color:#1976d2;border:4px solid #1976d2;border-radius:4px'),
     B('Thick Pill','background:transparent;color:#0e7490;border:4px solid #0e7490;border-radius:9999px;padding:6px 24px'),
     B('Top Only','background:transparent;color:#333;border-top:3px solid #1976d2;border-left:none;border-right:none;border-bottom:none;border-radius:0;padding:12px 24px'),
@@ -1839,7 +1877,7 @@ const BUTTON_CATALOG = [
     B('Autumn Leaf','background:linear-gradient(135deg,#d35400,#e74c3c,#c0392b);color:#fff;border:none;border-radius:4px;font-weight:700'),
     B('Summer Sun','background:linear-gradient(135deg,#f9d423,#f83600);color:#fff;border:none;border-radius:50px;font-weight:700;box-shadow:0 4px 15px rgba(249,212,35,0.4)'),
     B('Fresh Mint','background:linear-gradient(135deg,#a8edea,#fed6e3);color:#2c3e50;border:none;border-radius:8px;font-weight:600'),
-  ]},  { category: 'Status & Feedback', buttons: [
+  ]},  { category: 'Badges & Tags', buttons: [
     B('✓ Success','background:#d4edda;color:#155724;border:1px solid #c3e6cb;border-radius:4px;font-weight:600'),
     B('✕ Error','background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:4px;font-weight:600'),
     B('⚠ Warning','background:#fff3cd;color:#856404;border:1px solid #ffeeba;border-radius:4px;font-weight:600'),
@@ -1859,7 +1897,7 @@ const BUTTON_CATALOG = [
     B('Glow White','background:#1976d2;color:#fff;border:none;border-radius:4px;text-shadow:0 0 10px rgba(255,255,255,0.7),0 0 20px rgba(255,255,255,0.4)'),
     B('Chrome Text','background:#333;color:transparent;border:none;border-radius:4px;background-clip:text;font-weight:900;font-size:15px;-webkit-background-clip:text'),
   ]},
-  { category: 'Micro Interactions', buttons: [
+  { category: 'Animated', buttons: [
     B('Bounce Load','background:#1976d2;color:#fff;border:none;border-radius:4px;animation:btn-breathe 0.8s ease-in-out infinite'),
     B('Spin Icon','background:#2e7d32;color:#fff;border:none;border-radius:4px;font-weight:600'),
     B('Slide Fill','background:linear-gradient(90deg,#1976d2 50%,transparent 50%);background-size:200% 100%;background-position:right;color:#1976d2;border:2px solid #1976d2;border-radius:4px;transition:background-position 0.3s'),
@@ -1867,7 +1905,7 @@ const BUTTON_CATALOG = [
     B('Sheen','background:linear-gradient(105deg,#1976d2 40%,#5ab4f5 50%,#1976d2 60%);background-size:200%;color:#fff;border:none;border-radius:4px;animation:btn-shimmer 3s infinite'),
     B('Typewriter','background:#000;color:#0f0;border:none;border-radius:0;font-family:monospace;font-weight:700;overflow:hidden;white-space:nowrap;animation:btn-skeleton 1.5s infinite'),
   ]},
-  { category: 'Stripe / Pattern Fill', buttons: [
+  { category: 'Textures', buttons: [
     B('Diagonal Stripes','background:repeating-linear-gradient(45deg,#1976d2,#1976d2 5px,#1565c0 5px,#1565c0 10px);color:#fff;border:none;border-radius:4px;font-weight:700'),
     B('Checkerboard','background:repeating-conic-gradient(#1976d2 0% 25%,#42a5f5 0% 50%) 0 0 / 12px 12px;color:#fff;border:none;border-radius:4px;font-weight:700;text-shadow:1px 1px 2px rgba(0,0,0,0.4)'),
     B('Hatch','background:repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(255,255,255,0.15) 5px,rgba(255,255,255,0.15) 6px),#d32f2f;color:#fff;border:none;border-radius:4px;font-weight:700'),
@@ -1875,7 +1913,7 @@ const BUTTON_CATALOG = [
     B('Dotted Fill','background-color:#0e7490;background-image:radial-gradient(rgba(255,255,255,0.2) 1px,transparent 1px);background-size:8px 8px;color:#fff;border:none;border-radius:4px;font-weight:700'),
     B('Wave Fill','background:repeating-linear-gradient(-45deg,rgba(255,255,255,0.05) 0,rgba(255,255,255,0.05) 1px,transparent 0,transparent 50%),linear-gradient(to bottom,#e65100,#bf360c);background-size:6px 6px;color:#fff;border:none;border-radius:4px;font-weight:700'),
   ]},  // === Extended Gradient Library ===
-  { category: 'Gradient Mesh', buttons: [
+  { category: 'Gradients', buttons: [
     B('Aurora Mesh','background:radial-gradient(ellipse at 20% 50%,#e879f9 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,#38bdf8 0%,transparent 50%),radial-gradient(ellipse at 40% 80%,#34d399 0%,transparent 50%),#0f172a;color:#fff;border:none;border-radius:12px;font-weight:700'),
     B('Sunset Mesh','background:radial-gradient(ellipse at 20% 80%,#fbbf24 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,#ef4444 0%,transparent 50%),radial-gradient(ellipse at 50% 50%,#f97316 0%,transparent 50%),#7c2d12;color:#fff;border:none;border-radius:12px;font-weight:700'),
     B('Ocean Mesh','background:radial-gradient(ellipse at 30% 30%,#06b6d4 0%,transparent 50%),radial-gradient(ellipse at 70% 70%,#3b82f6 0%,transparent 50%),radial-gradient(ellipse at 50% 10%,#818cf8 0%,transparent 50%),#0c4a6e;color:#fff;border:none;border-radius:12px;font-weight:700'),
@@ -1885,7 +1923,7 @@ const BUTTON_CATALOG = [
     B('Warm Mesh','background:radial-gradient(ellipse at 10% 90%,#fbbf24 0%,transparent 50%),radial-gradient(ellipse at 90% 10%,#f87171 0%,transparent 50%),radial-gradient(ellipse at 50% 50%,#fb923c 0%,transparent 50%),#fef3c7;color:#78350f;border:none;border-radius:12px;font-weight:700'),
     B('Cool Mesh','background:radial-gradient(ellipse at 20% 80%,#2dd4bf 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,#818cf8 0%,transparent 50%),radial-gradient(ellipse at 50% 50%,#38bdf8 0%,transparent 50%),#f0f9ff;color:#1e3a5f;border:none;border-radius:12px;font-weight:700'),
   ]},  // === Extended Shape Library ===
-  { category: 'Ribbon / Banner', buttons: [
+  { category: 'Shapes & Geometry', buttons: [
     B('Ribbon Left','background:#d32f2f;color:#fff;border:none;border-radius:0;position:relative;clip-path:polygon(0% 0%,90% 0%,100% 50%,90% 100%,0% 100%);padding:10px 32px 10px 16px;font-weight:700'),
     B('Ribbon Right','background:#1976d2;color:#fff;border:none;border-radius:0;clip-path:polygon(10% 0%,100% 0%,100% 100%,10% 100%,0% 50%);padding:10px 16px 10px 32px;font-weight:700'),
     B('Tag','background:#2e7d32;color:#fff;border:none;border-radius:4px 0 0 4px;padding:8px 20px 8px 16px;font-weight:600;box-shadow:3px 0 0 #1b5e20'),
@@ -1894,7 +1932,7 @@ const BUTTON_CATALOG = [
     B('Chevron Both','background:#e65100;color:#fff;border:none;border-radius:0;clip-path:polygon(12px 0%,calc(100% - 12px) 0%,100% 50%,calc(100% - 12px) 100%,12px 100%,0% 50%);padding:10px 32px;font-weight:700'),
     B('Ticket','background:#0891b2;color:#fff;border:none;border-radius:12px;padding:10px 28px;font-weight:700;box-shadow:inset 8px 0 0 -4px var(--bg),inset -8px 0 0 -4px var(--bg)'),
   ]},
-  { category: 'Trapezoid / Tab', buttons: [
+  { category: 'Shapes & Geometry', buttons: [
     B('Tab Up','background:#1976d2;color:#fff;border:none;border-radius:0;clip-path:polygon(10% 0%,90% 0%,100% 100%,0% 100%);padding:10px 28px;font-weight:700'),
     B('Tab Down','background:#2e7d32;color:#fff;border:none;border-radius:0;clip-path:polygon(0% 0%,100% 0%,90% 100%,10% 100%);padding:10px 28px;font-weight:700'),
     B('Folder Tab','background:#f5f5f5;color:#333;border:1px solid #ccc;border-bottom:none;border-radius:8px 8px 0 0;padding:10px 24px;font-weight:600'),
@@ -1903,7 +1941,7 @@ const BUTTON_CATALOG = [
     B('Reverse Slash','background:#0e7490;color:#fff;border:none;border-radius:0;clip-path:polygon(20px 0%,100% 0%,100% 100%,0% 100%);padding:10px 16px 10px 36px;font-weight:700'),
   ]},
   // === Extended Interaction Patterns ===
-  { category: 'Toggle Group', buttons: [
+  { category: 'Interactive', buttons: [
     B('List','background:#fff;color:#1976d2;border:1px solid #1976d2;border-radius:4px 0 0 4px;font-weight:600;border-right:none'),
     B('Grid','background:#1976d2;color:#fff;border:1px solid #1976d2;border-radius:0;font-weight:600'),
     B('Map','background:#fff;color:#1976d2;border:1px solid #1976d2;border-radius:0 4px 4px 0;font-weight:600;border-left:none'),
@@ -1917,7 +1955,7 @@ const BUTTON_CATALOG = [
     B('Tab Inactive','background:transparent;color:#999;border:none;border-bottom:3px solid transparent;border-radius:0;padding:10px 20px;font-weight:400'),
     B('Underline Active','background:transparent;color:#000;border:none;border-bottom:2px solid #000;border-radius:0;padding:8px 16px;font-weight:700'),
   ]},
-  { category: 'Switch / Slider', buttons: [
+  { category: 'Interactive', buttons: [
     B('iOS Off','background:#e5e5ea;color:transparent;border:none;border-radius:9999px;width:51px;height:31px;padding:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1)','●'),
     B('iOS On','background:#34c759;color:#fff;border:none;border-radius:9999px;width:51px;height:31px;padding:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1)','●'),
     B('Material Off','background:#e0e0e0;color:transparent;border:none;border-radius:9999px;width:40px;height:20px;padding:0'),
@@ -1929,7 +1967,7 @@ const BUTTON_CATALOG = [
     B('Dot 2','background:#e0e0e0;color:transparent;border:none;border-radius:50%;width:10px;height:10px;padding:0'),
     B('Dot 3','background:#e0e0e0;color:transparent;border:none;border-radius:50%;width:10px;height:10px;padding:0'),
   ]},
-  { category: 'Breadcrumb', buttons: [
+  { category: 'Interactive', buttons: [
     B('Home','background:transparent;color:#1976d2;border:none;border-radius:0;font-weight:400;text-decoration:underline;font-size:12px'),
     B('/','background:transparent;color:#999;border:none;border-radius:0;padding:0 4px;font-size:12px;cursor:default'),
     B('Products','background:transparent;color:#1976d2;border:none;border-radius:0;font-weight:400;text-decoration:underline;font-size:12px'),
@@ -1940,7 +1978,7 @@ const BUTTON_CATALOG = [
     B('Chip Crumb','background:#e3f2fd;color:#1565c0;border:none;border-radius:16px;padding:4px 12px;font-size:11px;font-weight:500'),
   ]},
   // === Design System Tokens ===
-  { category: 'Shadcn/ui', buttons: [
+  { category: 'Design Systems', buttons: [
     B('Default','background:#18181b;color:#fafafa;border:none;border-radius:6px;font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,0.05)'),
     B('Secondary','background:#f4f4f5;color:#18181b;border:none;border-radius:6px;font-weight:500'),
     B('Outline','background:#fff;color:#18181b;border:1px solid #e4e4e7;border-radius:6px;font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,0.05)'),
@@ -1950,7 +1988,7 @@ const BUTTON_CATALOG = [
     B('Outline Hover','background:#f4f4f5;color:#18181b;border:1px solid #e4e4e7;border-radius:6px;font-weight:500'),
     B('Icon Only','background:#fff;color:#18181b;border:1px solid #e4e4e7;border-radius:6px;width:40px;height:40px;padding:0;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(0,0,0,0.05)','⚙'),
   ]},
-  { category: 'Chakra UI', buttons: [
+  { category: 'Design Systems', buttons: [
     B('Primary','background:#3182ce;color:#fff;border:none;border-radius:6px;font-weight:600;font-family:system-ui'),
     B('Secondary','background:#718096;color:#fff;border:none;border-radius:6px;font-weight:600;font-family:system-ui'),
     B('Success','background:#38a169;color:#fff;border:none;border-radius:6px;font-weight:600;font-family:system-ui'),
@@ -1961,7 +1999,7 @@ const BUTTON_CATALOG = [
     B('Link','background:transparent;color:#3182ce;border:none;border-radius:0;font-weight:600;font-family:system-ui;text-decoration:underline'),
     B('Teal','background:#319795;color:#fff;border:none;border-radius:6px;font-weight:600;font-family:system-ui'),
   ]},
-  { category: 'Radix Themes', buttons: [
+  { category: 'Design Systems', buttons: [
     B('Classic Blue','background:#0090ff;color:#fff;border:none;border-radius:4px;font-weight:500;font-family:system-ui'),
     B('Classic Red','background:#e5484d;color:#fff;border:none;border-radius:4px;font-weight:500;font-family:system-ui'),
     B('Classic Green','background:#30a46c;color:#fff;border:none;border-radius:4px;font-weight:500;font-family:system-ui'),
@@ -1971,7 +2009,7 @@ const BUTTON_CATALOG = [
     B('Surface','background:#f1f3f5;color:#11181c;border:none;border-radius:4px;font-weight:500;font-family:system-ui'),
     B('Ghost','background:transparent;color:#11181c;border:none;border-radius:4px;font-weight:500;font-family:system-ui'),
   ]},
-  { category: 'Mantine', buttons: [
+  { category: 'Design Systems', buttons: [
     B('Filled Blue','background:#228be6;color:#fff;border:none;border-radius:4px;font-weight:600;font-family:system-ui'),
     B('Filled Red','background:#fa5252;color:#fff;border:none;border-radius:4px;font-weight:600;font-family:system-ui'),
     B('Filled Green','background:#40c057;color:#fff;border:none;border-radius:4px;font-weight:600;font-family:system-ui'),
@@ -1983,7 +2021,7 @@ const BUTTON_CATALOG = [
     B('Compact','background:#228be6;color:#fff;border:none;border-radius:4px;font-weight:600;padding:2px 8px;font-size:11px;font-family:system-ui'),
     B('XL','background:#228be6;color:#fff;border:none;border-radius:4px;font-weight:600;padding:14px 32px;font-size:16px;font-family:system-ui'),
   ]},
-  { category: 'DaisyUI', buttons: [
+  { category: 'Design Systems', buttons: [
     B('Primary','background:#2563eb;color:#fff;border:none;border-radius:8px;font-weight:600;text-transform:uppercase;font-size:12px;letter-spacing:0.5px'),
     B('Secondary','background:#d926a9;color:#fff;border:none;border-radius:8px;font-weight:600;text-transform:uppercase;font-size:12px;letter-spacing:0.5px'),
     B('Accent','background:#1fb2a6;color:#fff;border:none;border-radius:8px;font-weight:600;text-transform:uppercase;font-size:12px;letter-spacing:0.5px'),
@@ -1996,7 +2034,7 @@ const BUTTON_CATALOG = [
     B('Link','background:transparent;color:#2563eb;border:none;border-radius:8px;font-weight:600;text-decoration:underline;font-size:12px'),
   ]},
   // === Industry Verticals Extended ===
-  { category: 'Music / Audio', buttons: [
+  { category: 'App Patterns', buttons: [
     B('Play','background:#1db954;color:#fff;border:none;border-radius:9999px;font-weight:700;padding:12px 32px'),
     B('Shuffle','background:rgba(255,255,255,0.1);color:#fff;border:none;border-radius:9999px;padding:8px 20px;font-weight:600'),
     B('Queue','background:transparent;color:#b3b3b3;border:1px solid #b3b3b3;border-radius:4px;font-weight:500'),
@@ -2007,7 +2045,7 @@ const BUTTON_CATALOG = [
     B('Stop','background:#333;color:#fff;border:none;border-radius:4px;width:44px;height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:14px'),
     B('Waveform','background:linear-gradient(90deg,#1db954 20%,#1aa34a 40%,#158c40 60%,#1db954 80%);color:#fff;border:none;border-radius:4px;font-weight:700'),
   ]},
-  { category: 'Photography', buttons: [
+  { category: 'App Patterns', buttons: [
     B('Capture','background:#000;color:#fff;border:none;border-radius:50%;width:64px;height:64px;padding:0;display:inline-flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 3px #fff,inset 0 0 0 5px #000'),
     B('Edit Photo','background:#4a90d9;color:#fff;border:none;border-radius:6px;font-weight:600'),
     B('Filter','background:transparent;color:#333;border:1px solid #ddd;border-radius:4px;font-weight:500'),
@@ -2017,7 +2055,7 @@ const BUTTON_CATALOG = [
     B('HDR','background:#fdd835;color:#333;border:none;border-radius:2px;font-weight:900;font-size:11px;letter-spacing:2px'),
     B('Portrait','background:linear-gradient(135deg,#f5d0c5,#d4a0a0);color:#5c2e2e;border:none;border-radius:6px;font-weight:600'),
   ]},
-  { category: 'Fitness', buttons: [
+  { category: 'App Patterns', buttons: [
     B('Start Run','background:linear-gradient(135deg,#11998e,#38ef7d);color:#000;border:none;border-radius:50px;font-weight:700;padding:12px 32px;box-shadow:0 4px 15px rgba(56,239,125,0.3)'),
     B('Log Workout','background:#ff6b35;color:#fff;border:none;border-radius:8px;font-weight:700'),
     B('Track Calories','background:#e74c3c;color:#fff;border:none;border-radius:6px;font-weight:600'),
@@ -2028,7 +2066,7 @@ const BUTTON_CATALOG = [
     B('- Weight','background:transparent;color:#3498db;border:2px solid #3498db;border-radius:4px;font-weight:700'),
     B('Share Activity','background:#1877f2;color:#fff;border:none;border-radius:8px;font-weight:600'),
   ]},
-  { category: 'Social Media', buttons: [
+  { category: 'App Patterns', buttons: [
     B('Like','background:transparent;color:#ed4956;border:none;border-radius:0;font-size:20px;padding:4px','♥'),
     B('Comment','background:transparent;color:#262626;border:none;border-radius:0;font-size:20px;padding:4px','💬'),
     B('Share','background:transparent;color:#262626;border:none;border-radius:0;font-size:20px;padding:4px','↗'),
@@ -2042,7 +2080,7 @@ const BUTTON_CATALOG = [
     B('Story','background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);color:#fff;border:none;border-radius:50%;width:52px;height:52px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:20px'),
     B('Connect','background:#0a66c2;color:#fff;border:none;border-radius:9999px;font-weight:600;padding:6px 16px'),
   ]},
-  { category: 'Maps / Navigation', buttons: [
+  { category: 'App Patterns', buttons: [
     B('Navigate','background:#4285f4;color:#fff;border:none;border-radius:50px;font-weight:700;padding:12px 28px;box-shadow:0 4px 12px rgba(66,133,244,0.3)'),
     B('Directions','background:#fff;color:#1a73e8;border:1px solid #dadce0;border-radius:24px;font-weight:500;padding:8px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.1)'),
     B('Save Place','background:transparent;color:#5f6368;border:1px solid #dadce0;border-radius:8px;font-weight:500'),
@@ -2053,7 +2091,7 @@ const BUTTON_CATALOG = [
     B('Cycling','background:#4285f4;color:#fff;border:none;border-radius:4px;font-weight:600'),
     B('Street View','background:#0f9d58;color:#fff;border:none;border-radius:24px;font-weight:600;padding:8px 20px'),
   ]},
-  { category: 'Productivity / SaaS', buttons: [
+  { category: 'App Patterns', buttons: [
     B('New Task','background:#4f46e5;color:#fff;border:none;border-radius:6px;font-weight:600'),
     B('Assign','background:#7c3aed;color:#fff;border:none;border-radius:6px;font-weight:600'),
     B('Mark Done','background:#059669;color:#fff;border:none;border-radius:6px;font-weight:600'),
@@ -2067,7 +2105,7 @@ const BUTTON_CATALOG = [
     B('Upgrade Plan','background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;border:none;border-radius:6px;font-weight:700'),
     B('API Key','background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:4px;font-family:monospace;font-size:11px'),
   ]},
-  { category: 'Messaging / Chat', buttons: [
+  { category: 'App Patterns', buttons: [
     B('Send','background:#0084ff;color:#fff;border:none;border-radius:50%;width:40px;height:40px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:16px','↑'),
     B('React','background:#f0f0f0;color:#333;border:none;border-radius:9999px;padding:4px 12px;font-size:20px','👍'),
     B('Attach','background:transparent;color:#0084ff;border:none;border-radius:50%;width:36px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:18px','+'),
@@ -2118,7 +2156,7 @@ const BUTTON_CATALOG = [
     B('Onyx','background:#353839;color:#fff;border:none;border-radius:4px;font-weight:700'),
     B('Pearl','background:linear-gradient(135deg,#f5f5f0,#eae8e0,#f5f5f0);color:#555;border:1px solid #d0cec8;border-radius:4px;font-weight:700'),
   ]},
-  { category: 'Monospace / Terminal', buttons: [
+  { category: 'Retro Computing', buttons: [
     B('$ run','background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;font-family:monospace;font-weight:500;font-size:12px'),
     B('git push','background:#238636;color:#fff;border:none;border-radius:6px;font-family:monospace;font-weight:600;font-size:12px'),
     B('git pull','background:#1f6feb;color:#fff;border:none;border-radius:6px;font-family:monospace;font-weight:600;font-size:12px'),
@@ -2130,7 +2168,7 @@ const BUTTON_CATALOG = [
     B('ssh','background:#e8a317;color:#000;border:none;border-radius:2px;font-family:monospace;font-weight:700;font-size:12px'),
     B('docker','background:#2496ed;color:#fff;border:none;border-radius:4px;font-family:monospace;font-weight:600;font-size:12px'),
   ]},
-  { category: 'Notification Badges', buttons: [
+  { category: 'Badges & Tags', buttons: [
     B('1','background:#ff3b30;color:#fff;border:none;border-radius:50%;width:20px;height:20px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700'),
     B('5','background:#ff3b30;color:#fff;border:none;border-radius:50%;width:20px;height:20px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700'),
     B('12','background:#ff3b30;color:#fff;border:none;border-radius:9999px;width:auto;min-width:20px;height:20px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700'),
@@ -2142,7 +2180,7 @@ const BUTTON_CATALOG = [
     B('FREE','background:#34c759;color:#fff;border:none;border-radius:4px;padding:2px 6px;font-size:9px;font-weight:800;letter-spacing:0.5px'),
     B('LIVE','background:#ff3b30;color:#fff;border:none;border-radius:4px;padding:2px 6px;font-size:9px;font-weight:800;letter-spacing:0.5px;animation:btn-pulse 2s infinite;--pulse-color:rgba(255,59,48,0.5)'),
   ]},
-  { category: 'Cookie Consent', buttons: [
+  { category: 'Form & Dialog', buttons: [
     B('Accept All','background:#1976d2;color:#fff;border:none;border-radius:4px;font-weight:600;padding:10px 28px'),
     B('Reject All','background:transparent;color:#666;border:1px solid #ccc;border-radius:4px;font-weight:500;padding:10px 28px'),
     B('Manage Preferences','background:transparent;color:#1976d2;border:none;border-radius:4px;font-weight:500;text-decoration:underline;font-size:12px'),
@@ -2151,7 +2189,7 @@ const BUTTON_CATALOG = [
     B('Save My Choices','background:#2e7d32;color:#fff;border:none;border-radius:4px;font-weight:600;padding:10px 28px'),
     B('Close ✕','background:transparent;color:#999;border:none;border-radius:50%;width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:16px'),
   ]},
-  { category: 'Media Controls', buttons: [
+  { category: 'Interactive', buttons: [
     B('▶','background:transparent;color:#fff;border:none;border-radius:50%;width:64px;height:64px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:28px;background:rgba(255,255,255,0.2);backdrop-filter:blur(10px)'),
     B('⏸','background:transparent;color:#fff;border:none;border-radius:50%;width:64px;height:64px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:28px;background:rgba(255,255,255,0.2);backdrop-filter:blur(10px)'),
     B('⏮','background:transparent;color:#fff;border:none;border-radius:50%;width:44px;height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:16px;background:rgba(255,255,255,0.1)'),
@@ -2163,7 +2201,7 @@ const BUTTON_CATALOG = [
     B('HD','background:#000;color:#fff;border:1px solid #666;border-radius:2px;padding:2px 6px;font-size:10px;font-weight:700'),
     B('⛶','background:transparent;color:#333;border:none;font-size:18px;padding:4px'),
   ]},
-  { category: 'Pagination', buttons: [
+  { category: 'Interactive', buttons: [
     B('«','background:transparent;color:#1976d2;border:1px solid #e0e0e0;border-radius:4px 0 0 4px;width:36px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center'),
     B('1','background:#1976d2;color:#fff;border:1px solid #1976d2;width:36px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-weight:700'),
     B('2','background:transparent;color:#333;border:1px solid #e0e0e0;width:36px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center'),
@@ -2176,7 +2214,7 @@ const BUTTON_CATALOG = [
     B('Load More','background:transparent;color:#1976d2;border:2px solid #1976d2;border-radius:6px;padding:10px 28px;font-weight:600'),
   ]},
   // === Extended Cultural / Regional Styles ===
-  { category: 'Nordic / Scandinavian', buttons: [
+  { category: 'Cultural', buttons: [
     B('Hygge','background:#f5f0e8;color:#3d3228;border:none;border-radius:6px;font-weight:500;letter-spacing:1px'),
     B('Fjord Blue','background:#4a7c9b;color:#fff;border:none;border-radius:4px;font-weight:600;letter-spacing:0.5px'),
     B('Snow','background:#fff;color:#333;border:1px solid #e8e4dc;border-radius:4px;font-weight:400;letter-spacing:1px'),
@@ -2186,7 +2224,7 @@ const BUTTON_CATALOG = [
     B('Birch','background:#f0ede8;color:#5c4f3c;border:1px solid #c5b99a;border-radius:2px;font-weight:400;letter-spacing:2px;font-size:11px'),
     B('Lagom','background:#5b7065;color:#f0ede8;border:none;border-radius:4px;font-weight:500;letter-spacing:1px'),
   ]},
-  { category: 'Moroccan / Mediterranean', buttons: [
+  { category: 'Cultural', buttons: [
     B('Terracotta','background:#c1440e;color:#fff;border:none;border-radius:0;font-weight:700;letter-spacing:1px'),
     B('Zellige Blue','background:#2e86ab;color:#fff;border:none;border-radius:0;font-weight:700'),
     B('Saffron','background:#e8b923;color:#4a3000;border:none;border-radius:0;font-weight:700'),
@@ -2196,7 +2234,7 @@ const BUTTON_CATALOG = [
     B('Marrakech','background:linear-gradient(135deg,#c1440e,#e8b923);color:#fff;border:none;border-radius:0;font-weight:700;letter-spacing:1px'),
     B('Mint Tea','background:#a8d8b9;color:#1a4d3e;border:none;border-radius:0;font-weight:600'),
   ]},
-  { category: 'Korean Hanbok', buttons: [
+  { category: 'Cultural', buttons: [
     B('Dancheong Red','background:#d4342e;color:#f0ede8;border:none;border-radius:4px;font-weight:700'),
     B('Norigae Blue','background:#2e4a8a;color:#f0ede8;border:none;border-radius:4px;font-weight:700'),
     B('Hanbok Green','background:#1a6a3a;color:#f0ede8;border:none;border-radius:4px;font-weight:700'),
@@ -2206,7 +2244,7 @@ const BUTTON_CATALOG = [
     B('Kkotdam','background:linear-gradient(135deg,#d4342e,#e8c94a,#1a6a3a);color:#fff;border:none;border-radius:4px;font-weight:700;text-shadow:1px 1px 2px rgba(0,0,0,0.3)'),
     B('Moon Jar','background:#f0ede8;color:#555;border:1px solid #c5b99a;border-radius:50%;width:56px;height:56px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:500'),
   ]},
-  { category: 'Indian Textile', buttons: [
+  { category: 'Cultural', buttons: [
     B('Sari Gold','background:linear-gradient(135deg,#c9920e,#f5d67a,#c9920e);color:#3d0c00;border:none;border-radius:0;font-weight:700;letter-spacing:1px;text-shadow:0 1px 0 rgba(255,255,255,0.3)'),
     B('Rangoli','background:linear-gradient(135deg,#e74c3c,#f39c12,#27ae60,#2980b9);color:#fff;border:none;border-radius:0;font-weight:700;text-shadow:1px 1px 2px rgba(0,0,0,0.4)'),
     B('Indigo Dye','background:#274472;color:#f0ede8;border:none;border-radius:0;font-weight:600;letter-spacing:1px'),
@@ -2217,7 +2255,7 @@ const BUTTON_CATALOG = [
     B('Marigold','background:#ff9800;color:#3d0c00;border:none;border-radius:0;font-weight:700'),
   ]},
   // === Extended Functional Patterns ===
-  { category: 'Form Actions', buttons: [
+  { category: 'Form & Dialog', buttons: [
     B('Submit','background:#1976d2;color:#fff;border:none;border-radius:6px;font-weight:600;padding:12px 40px'),
     B('Cancel','background:transparent;color:#666;border:1px solid #ccc;border-radius:6px;font-weight:500;padding:12px 40px'),
     B('Reset','background:transparent;color:#d32f2f;border:none;border-radius:6px;font-weight:500'),
@@ -2229,7 +2267,7 @@ const BUTTON_CATALOG = [
     B('Update','background:#e65100;color:#fff;border:none;border-radius:6px;font-weight:600;padding:12px 28px'),
     B('Confirm Delete','background:#d32f2f;color:#fff;border:none;border-radius:6px;font-weight:700;padding:12px 28px'),
   ]},
-  { category: 'Dialog Actions', buttons: [
+  { category: 'Form & Dialog', buttons: [
     B('OK','background:#1976d2;color:#fff;border:none;border-radius:4px;font-weight:600;padding:8px 32px;min-width:80px'),
     B('Cancel','background:#f5f5f5;color:#333;border:1px solid #ccc;border-radius:4px;font-weight:500;padding:8px 32px;min-width:80px'),
     B('Yes','background:#2e7d32;color:#fff;border:none;border-radius:4px;font-weight:600;padding:8px 32px'),
@@ -2241,7 +2279,7 @@ const BUTTON_CATALOG = [
     B('Never Show Again','background:transparent;color:#999;border:none;border-radius:4px;font-weight:400;font-size:11px'),
     B('Remind Later','background:#f5f5f5;color:#666;border:none;border-radius:4px;font-weight:500'),
   ]},
-  { category: 'Auth / Login', buttons: [
+  { category: 'Form & Dialog', buttons: [
     B('Sign In','background:#1976d2;color:#fff;border:none;border-radius:6px;font-weight:600;padding:12px 48px;font-size:15px'),
     B('Create Account','background:#2e7d32;color:#fff;border:none;border-radius:6px;font-weight:600;padding:12px 32px'),
     B('Forgot Password?','background:transparent;color:#1976d2;border:none;font-weight:500;font-size:12px;text-decoration:underline'),
@@ -2253,7 +2291,7 @@ const BUTTON_CATALOG = [
     B('Use Passkey','background:#000;color:#fff;border:none;border-radius:6px;font-weight:600;padding:10px 24px'),
     B('2FA Setup','background:#0e7490;color:#fff;border:none;border-radius:6px;font-weight:600'),
   ]},
-  { category: 'Pricing / Plans', buttons: [
+  { category: 'Form & Dialog', buttons: [
     B('Free','background:#f0f0f0;color:#333;border:1px solid #ddd;border-radius:6px;font-weight:600;padding:10px 28px'),
     B('Pro','background:linear-gradient(135deg,#667eea,#0369a1);color:#fff;border:none;border-radius:6px;font-weight:700;padding:10px 28px'),
     B('Enterprise','background:#000;color:#fff;border:none;border-radius:6px;font-weight:700;padding:10px 28px'),
@@ -2265,7 +2303,7 @@ const BUTTON_CATALOG = [
     B('Best Value','background:#2e7d32;color:#fff;border:none;border-radius:0;font-size:10px;font-weight:700;padding:4px 12px;text-transform:uppercase;letter-spacing:1px'),
     B('Try Free for 14 Days','background:#0891b2;color:#fff;border:none;border-radius:8px;font-weight:700;padding:14px 28px;box-shadow:0 4px 12px rgba(108,92,231,0.3)'),
   ]},
-  { category: 'Stepper / Wizard', buttons: [
+  { category: 'Form & Dialog', buttons: [
     B('Step 1','background:#1976d2;color:#fff;border:none;border-radius:50%;width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-weight:700'),
     B('Step 2','background:#e0e0e0;color:#666;border:none;border-radius:50%;width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-weight:700'),
     B('Step 3','background:#e0e0e0;color:#666;border:none;border-radius:50%;width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-weight:700'),
@@ -2277,7 +2315,7 @@ const BUTTON_CATALOG = [
     B('Step Label','background:transparent;color:#1976d2;border:none;font-weight:600;font-size:12px;cursor:default'),
     B('Line','background:#e0e0e0;color:transparent;border:none;width:40px;height:2px;padding:0;cursor:default'),
   ]},
-  { category: 'Toast / Snackbar Actions', buttons: [
+  { category: 'Form & Dialog', buttons: [
     B('Undo','background:transparent;color:#bb86fc;border:none;border-radius:4px;font-weight:600;text-transform:uppercase;font-size:12px;letter-spacing:0.5px'),
     B('Dismiss','background:transparent;color:#fff;border:none;border-radius:4px;font-weight:500;font-size:12px'),
     B('Retry','background:transparent;color:#03dac5;border:none;border-radius:4px;font-weight:600;text-transform:uppercase;font-size:12px'),
@@ -2286,7 +2324,7 @@ const BUTTON_CATALOG = [
     B('Refresh','background:rgba(255,255,255,0.1);color:#fff;border:none;border-radius:4px;font-weight:500;font-size:12px;padding:4px 12px'),
     B('Details','background:transparent;color:#03dac5;border:1px solid #03dac5;border-radius:4px;font-weight:500;font-size:11px;padding:4px 12px'),
   ]},
-  { category: 'Empty State CTAs', buttons: [
+  { category: 'Form & Dialog', buttons: [
     B('Create First Item','background:#4f46e5;color:#fff;border:none;border-radius:8px;font-weight:600;padding:14px 32px;font-size:15px'),
     B('Import Data','background:transparent;color:#4f46e5;border:2px dashed #4f46e5;border-radius:8px;font-weight:600;padding:12px 28px'),
     B('Browse Templates','background:#f3f4f6;color:#374151;border:none;border-radius:8px;font-weight:500;padding:12px 28px'),
@@ -2296,7 +2334,7 @@ const BUTTON_CATALOG = [
     B('Upload File','background:transparent;color:#6b7280;border:2px dashed #d1d5db;border-radius:12px;padding:24px 32px;font-weight:500'),
     B('Get Started →','background:transparent;color:#4f46e5;border:none;font-weight:600;font-size:14px'),
   ]},
-  { category: 'Multi-Color Split', buttons: [
+  { category: 'Multi-Color', buttons: [
     B('Half Blue/Red','background:linear-gradient(90deg,#1976d2 50%,#d32f2f 50%);color:#fff;border:none;border-radius:6px;font-weight:700'),
     B('Half Black/White','background:linear-gradient(90deg,#000 50%,#fff 50%);color:#fff;border:1px solid #000;border-radius:6px;font-weight:700;text-shadow:1px 0 0 #000,-1px 0 0 #fff'),
     B('Tri Stripe','background:linear-gradient(90deg,#e74c3c 33%,#f1c40f 33% 66%,#27ae60 66%);color:#fff;border:none;border-radius:6px;font-weight:700;text-shadow:1px 1px 2px rgba(0,0,0,0.3)'),
@@ -2306,7 +2344,7 @@ const BUTTON_CATALOG = [
     B('Top Accent','background:#fff;color:#333;border:1px solid #e0e0e0;border-top:4px solid #d32f2f;border-radius:4px;font-weight:600'),
     B('Bottom Accent','background:#fff;color:#333;border:1px solid #e0e0e0;border-bottom:4px solid #2e7d32;border-radius:4px;font-weight:600'),
   ]},
-  { category: 'Text-Only Variants', buttons: [
+  { category: 'Ghost / Text', buttons: [
     B('Underline Hover','background:transparent;color:#1976d2;border:none;border-bottom:2px solid transparent;transition:border-color 0.2s'),
     B('Bold Link','background:transparent;color:#000;border:none;font-weight:900;font-size:14px'),
     B('Strikethrough','background:transparent;color:#999;border:none;text-decoration:line-through'),
@@ -2318,7 +2356,7 @@ const BUTTON_CATALOG = [
     B('All Caps','background:transparent;color:#333;border:none;text-transform:uppercase;font-weight:800;letter-spacing:3px;font-size:11px'),
     B('Small','background:transparent;color:#666;border:none;font-size:10px;font-weight:400'),
   ]},
-  { category: 'Neon Signs', buttons: [
+  { category: 'Neon Glow', buttons: [
     B('OPEN','background:transparent;color:#ff073a;border:2px solid #ff073a;border-radius:4px;font-weight:900;text-transform:uppercase;letter-spacing:4px;text-shadow:0 0 7px #ff073a,0 0 14px #ff073a;box-shadow:0 0 7px #ff073a,0 0 14px rgba(255,7,58,0.5),inset 0 0 7px rgba(255,7,58,0.2)'),
     B('BAR','background:transparent;color:#00d4ff;border:2px solid #00d4ff;border-radius:4px;font-weight:900;text-transform:uppercase;letter-spacing:6px;text-shadow:0 0 7px #00d4ff,0 0 14px #00d4ff;box-shadow:0 0 7px #00d4ff,0 0 14px rgba(0,212,255,0.5),inset 0 0 7px rgba(0,212,255,0.2)'),
     B('HOTEL','background:transparent;color:#ffff00;border:2px solid #ffff00;border-radius:4px;font-weight:900;text-transform:uppercase;letter-spacing:4px;text-shadow:0 0 7px #ffff00,0 0 14px #ffff00;box-shadow:0 0 7px #ffff00,0 0 14px rgba(255,255,0,0.5),inset 0 0 7px rgba(255,255,0,0.2)'),
@@ -2329,7 +2367,7 @@ const BUTTON_CATALOG = [
     B('JAZZ','background:transparent;color:#ffd700;border:2px solid #ffd700;border-radius:4px;font-weight:900;letter-spacing:6px;font-style:italic;text-shadow:0 0 7px #ffd700,0 0 14px #ffd700;box-shadow:0 0 7px #ffd700,0 0 14px rgba(255,215,0,0.5),inset 0 0 7px rgba(255,215,0,0.2)'),
   ]},
   // === Additional Layout Patterns ===
-  { category: 'Pill + Icon Combo', buttons: [
+  { category: 'Icon + Text Combos', buttons: [
     B('★ Star','background:#fdd835;color:#333;border:none;border-radius:9999px;padding:8px 20px;font-weight:700;display:inline-flex;align-items:center;gap:6px'),
     B('♥ Heart','background:#e91e63;color:#fff;border:none;border-radius:9999px;padding:8px 20px;font-weight:600;display:inline-flex;align-items:center;gap:6px'),
     B('→ Go','background:#1976d2;color:#fff;border:none;border-radius:9999px;padding:8px 20px;font-weight:600;display:inline-flex;align-items:center;gap:6px'),
@@ -2341,7 +2379,7 @@ const BUTTON_CATALOG = [
     B('◆ Pro','background:#000;color:#ffd700;border:none;border-radius:9999px;padding:8px 20px;font-weight:700;display:inline-flex;align-items:center;gap:6px'),
     B('♦ VIP','background:linear-gradient(135deg,#c9920e,#f5d67a);color:#3d0c00;border:none;border-radius:9999px;padding:8px 20px;font-weight:700;display:inline-flex;align-items:center;gap:6px'),
   ]},  // === More Design System Styles ===
-  { category: 'Carbon Design', buttons: [
+  { category: 'Design Systems', buttons: [
     B('Primary','background:#0f62fe;color:#fff;border:none;border-radius:0;font-weight:400;padding:14px 64px 14px 16px;font-family:system-ui;font-size:14px'),
     B('Secondary','background:#393939;color:#fff;border:none;border-radius:0;font-weight:400;padding:14px 64px 14px 16px;font-family:system-ui;font-size:14px'),
     B('Tertiary','background:transparent;color:#0f62fe;border:1px solid #0f62fe;border-radius:0;font-weight:400;padding:14px 64px 14px 16px;font-family:system-ui;font-size:14px'),
@@ -2353,7 +2391,7 @@ const BUTTON_CATALOG = [
     B('Icon Only','background:#0f62fe;color:#fff;border:none;border-radius:0;width:48px;height:48px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:16px','→'),
     B('Small','background:#0f62fe;color:#fff;border:none;border-radius:0;font-weight:400;padding:8px 60px 8px 12px;font-family:system-ui;font-size:14px'),
   ]},
-  { category: 'Spectrum (Adobe)', buttons: [
+  { category: 'Design Systems', buttons: [
     B('CTA','background:#1473e6;color:#fff;border:none;border-radius:16px;font-weight:700;padding:7px 20px;font-family:system-ui'),
     B('Primary','background:#4b4b4b;color:#fff;border:none;border-radius:16px;font-weight:700;padding:7px 20px;font-family:system-ui'),
     B('Secondary','background:transparent;color:#4b4b4b;border:2px solid #4b4b4b;border-radius:16px;font-weight:700;padding:5px 18px;font-family:system-ui'),
@@ -2364,7 +2402,7 @@ const BUTTON_CATALOG = [
     B('Action XS','background:#1473e6;color:#fff;border:none;border-radius:16px;font-weight:700;padding:3px 12px;font-size:11px;font-family:system-ui'),
     B('Action XL','background:#1473e6;color:#fff;border:none;border-radius:20px;font-weight:700;padding:11px 28px;font-size:16px;font-family:system-ui'),
   ]},
-  { category: 'Primer (GitHub)', buttons: [
+  { category: 'Design Systems', buttons: [
     B('Primary','background:#2da44e;color:#fff;border:1px solid rgba(27,31,36,0.15);border-radius:6px;font-weight:500;font-family:system-ui;box-shadow:0 1px 0 rgba(27,31,36,0.04),inset 0 1px 0 rgba(255,255,255,0.25)'),
     B('Default','background:#f6f8fa;color:#24292f;border:1px solid rgba(27,31,36,0.15);border-radius:6px;font-weight:500;font-family:system-ui;box-shadow:0 1px 0 rgba(27,31,36,0.04),inset 0 1px 0 rgba(255,255,255,0.25)'),
     B('Danger','background:#cf222e;color:#fff;border:1px solid rgba(27,31,36,0.15);border-radius:6px;font-weight:500;font-family:system-ui;box-shadow:0 1px 0 rgba(27,31,36,0.04)'),
@@ -2375,7 +2413,7 @@ const BUTTON_CATALOG = [
     B('SM','background:#2da44e;color:#fff;border:1px solid rgba(27,31,36,0.15);border-radius:6px;font-weight:500;font-family:system-ui;padding:3px 12px;font-size:12px'),
     B('LG','background:#2da44e;color:#fff;border:1px solid rgba(27,31,36,0.15);border-radius:6px;font-weight:500;font-family:system-ui;padding:12px 24px;font-size:16px'),
   ]},
-  { category: 'Weather App', buttons: [
+  { category: 'Industry', buttons: [
     B('☀ Sunny','background:linear-gradient(135deg,#f7971e,#ffd200);color:#333;border:none;border-radius:8px;font-weight:700'),
     B('☁ Cloudy','background:linear-gradient(135deg,#bdc3c7,#2c3e50);color:#fff;border:none;border-radius:8px;font-weight:700'),
     B('🌧 Rainy','background:linear-gradient(135deg,#667eea,#0369a1);color:#fff;border:none;border-radius:8px;font-weight:700'),
@@ -2385,7 +2423,7 @@ const BUTTON_CATALOG = [
     B('°F / °C','background:#f0f0f0;color:#333;border:1px solid #ddd;border-radius:9999px;padding:6px 16px;font-weight:600;font-size:12px'),
     B('10-Day','background:transparent;color:#1976d2;border:1px solid #1976d2;border-radius:6px;font-weight:500;font-size:12px'),
   ]},
-  { category: 'Crypto / Web3', buttons: [
+  { category: 'App Patterns', buttons: [
     B('Connect Wallet','background:linear-gradient(135deg,#627eea,#3c3c3d);color:#fff;border:none;border-radius:12px;font-weight:700;padding:12px 28px;box-shadow:0 4px 12px rgba(98,126,234,0.3)'),
     B('Swap','background:#21262d;color:#58a6ff;border:1px solid #30363d;border-radius:20px;font-weight:600;padding:10px 28px'),
     B('Mint NFT','background:linear-gradient(135deg,#8b5cf6,#ec4899);color:#fff;border:none;border-radius:12px;font-weight:700;padding:12px 28px;box-shadow:0 4px 15px rgba(139,92,246,0.4)'),
@@ -2396,7 +2434,7 @@ const BUTTON_CATALOG = [
     B('Buy ETH','background:#627eea;color:#fff;border:none;border-radius:8px;font-weight:700'),
   ]},
   // === Extended Accessibility ===
-  { category: 'WCAG AA Contrast', buttons: [
+  { category: 'Accessibility', buttons: [
     B('4.5:1 Blue','background:#1565c0;color:#fff;border:none;border-radius:4px;font-weight:600;font-size:14px'),
     B('4.5:1 Dark','background:#37474f;color:#fff;border:none;border-radius:4px;font-weight:600;font-size:14px'),
     B('7:1 AAA Blue','background:#0d47a1;color:#fff;border:none;border-radius:4px;font-weight:600;font-size:14px'),
@@ -2406,7 +2444,7 @@ const BUTTON_CATALOG = [
     B('Focus Visible','background:#1976d2;color:#fff;border:none;border-radius:4px;font-weight:600;outline:3px solid #ff9800;outline-offset:2px'),
     B('Skip to Content','background:#000;color:#fff;border:none;border-radius:0;font-weight:700;font-size:14px;text-decoration:underline;padding:12px 24px'),
   ]},
-  { category: 'Rounded Extended', buttons: [
+  { category: 'Pill / Rounded', buttons: [
     B('Squircle','background:#1976d2;color:#fff;border:none;border-radius:22%;padding:12px 28px;font-weight:600'),
     B('Superellipse','background:#0e7490;color:#fff;border:none;border-radius:30%;padding:14px 28px;font-weight:600'),
     B('Leaf','background:#2e7d32;color:#fff;border:none;border-radius:4px 20px 4px 20px;font-weight:600'),
@@ -2416,7 +2454,7 @@ const BUTTON_CATALOG = [
     B('Capsule LG','background:#1976d2;color:#fff;border:none;border-radius:9999px;padding:16px 40px;font-size:16px;font-weight:600'),
     B('Lozenge','background:rgba(25,118,210,0.1);color:#1976d2;border:none;border-radius:9999px;padding:2px 10px;font-size:11px;font-weight:700'),
   ]},
-  { category: 'Pattern Fill Extended', buttons: [
+  { category: 'Textures', buttons: [
     B('Horizontal Lines','background:repeating-linear-gradient(0deg,#1976d2,#1976d2 2px,#1565c0 2px,#1565c0 6px);color:#fff;border:none;border-radius:4px;font-weight:700'),
     B('Vertical Lines','background:repeating-linear-gradient(90deg,#2e7d32,#2e7d32 2px,#1b5e20 2px,#1b5e20 6px);color:#fff;border:none;border-radius:4px;font-weight:700'),
     B('Grid','background:repeating-linear-gradient(0deg,rgba(255,255,255,0.1) 0px,rgba(255,255,255,0.1) 1px,transparent 1px,transparent 10px),repeating-linear-gradient(90deg,rgba(255,255,255,0.1) 0px,rgba(255,255,255,0.1) 1px,transparent 1px,transparent 10px),#0e7490;color:#fff;border:none;border-radius:4px;font-weight:700'),
@@ -2427,75 +2465,75 @@ const BUTTON_CATALOG = [
     B('Dots Outline','background:transparent;color:#333;border:2px solid #333;border-radius:4px;font-weight:700;background-image:radial-gradient(#333 1px,transparent 1px);background-size:8px 8px'),
   ]},
   // === Hover State Preview ===  // === Gradient + Shadow Combos ===  // === Gradient CTA Scale ===  // === Icon Circles with Gradient ===  // === Neon Pill Color Wheel ===  // === Opacity / Alpha Variants ===  // === Letter Spacing Scale ===  // === Font Family Showcase ===  // === CURATED: Historical OS Styles ===
-  { category: 'Windows 3.1', buttons: [
+  { category: 'Windows OS', buttons: [
     B('Win31','background:#c0c0c0;color:#000;border-top:2px solid #fff;border-left:2px solid #fff;border-bottom:2px solid #000;border-right:2px solid #000;padding:4px 12px;border-radius:0;font-family:MS Sans Serif,Arial,sans-serif;font-size:12px'),
     B('Win31 Focus','background:#c0c0c0;color:#000;border-top:2px solid #fff;border-left:2px solid #fff;border-bottom:2px solid #000;border-right:2px solid #000;padding:4px 12px;border-radius:0;font-family:MS Sans Serif,Arial,sans-serif;font-size:12px;outline:1px dotted #000;outline-offset:-4px'),
     B('Win31 Pressed','background:#c0c0c0;color:#000;border-top:2px solid #000;border-left:2px solid #000;border-bottom:2px solid #fff;border-right:2px solid #fff;padding:5px 11px 3px 13px;border-radius:0;font-family:MS Sans Serif,Arial,sans-serif;font-size:12px'),
   ]},
-  { category: 'Windows 95/98', buttons: [
+  { category: 'Windows OS', buttons: [
     B('Win98','background:#c0c0c0;color:#000;border-top:2px solid #dfdfdf;border-left:2px solid #dfdfdf;border-bottom:2px solid #808080;border-right:2px solid #808080;padding:4px 16px;border-radius:0;font-family:Tahoma,MS Sans Serif,sans-serif;font-size:11px;box-shadow:inset -1px -1px 0 #000,inset 1px 1px 0 #fff'),
     B('Win98 Default','background:#c0c0c0;color:#000;border-top:2px solid #dfdfdf;border-left:2px solid #dfdfdf;border-bottom:2px solid #808080;border-right:2px solid #808080;padding:4px 16px;border-radius:0;font-family:Tahoma,sans-serif;font-size:11px;box-shadow:inset -1px -1px 0 #000,inset 1px 1px 0 #fff;outline:1px solid #000;outline-offset:0'),
     B('Start','background:linear-gradient(180deg,#3a6ea5,#003d7e);color:#fff;border:none;border-radius:0 8px 8px 0;padding:4px 14px;font-family:Tahoma,sans-serif;font-size:11px;font-weight:700'),
   ]},
-  { category: 'Windows XP Luna', buttons: [
+  { category: 'Windows OS', buttons: [
     B('XP Default','background:linear-gradient(180deg,#fff 0%,#ece9d8 100%);color:#000;border:1px solid #003c74;padding:4px 16px;border-radius:3px;font-family:Tahoma,sans-serif;font-size:11px;box-shadow:inset 0 1px 0 #fff'),
     B('XP Start','background:linear-gradient(180deg,#3faa35,#287a1f);color:#fff;border:1px solid #1a5e12;border-radius:0 8px 8px 0;padding:6px 20px;font-family:Tahoma,sans-serif;font-size:12px;font-weight:700;font-style:italic;text-shadow:1px 1px 1px rgba(0,0,0,0.3)'),
     B('XP Focused','background:linear-gradient(180deg,#fff 0%,#ece9d8 100%);color:#000;border:1px solid #003c74;padding:4px 16px;border-radius:3px;font-family:Tahoma,sans-serif;font-size:11px;box-shadow:inset 0 1px 0 #fff,0 0 0 1px #003c74;outline:1px dotted #000;outline-offset:-4px'),
   ]},
-  { category: 'Windows Vista Aero', buttons: [
+  { category: 'Windows OS', buttons: [
     B('Aero Glass','background:linear-gradient(180deg,rgba(255,255,255,0.7) 0%,rgba(255,255,255,0.3) 49%,rgba(255,255,255,0.1) 50%,rgba(255,255,255,0.3) 100%);color:#1a3a5c;border:1px solid rgba(0,0,0,0.3);padding:6px 18px;border-radius:4px;font-family:Segoe UI,sans-serif;font-size:12px;box-shadow:0 1px 2px rgba(0,0,0,0.2)'),
     B('Aero Default','background:linear-gradient(180deg,#f0f0f0,#e5e5e5 49%,#d4d4d4 50%,#dfdfdf 100%);color:#000;border:1px solid #707070;padding:4px 14px;border-radius:3px;font-family:Segoe UI,sans-serif;font-size:12px'),
   ]},
-  { category: 'Windows 8 Metro', buttons: [
+  { category: 'Windows OS', buttons: [
     B('Metro Blue','background:#2d89ef;color:#fff;border:none;padding:10px 24px;border-radius:0;font-family:Segoe UI,sans-serif;font-weight:300;font-size:15px'),
     B('Metro Green','background:#00a300;color:#fff;border:none;padding:10px 24px;border-radius:0;font-family:Segoe UI,sans-serif;font-weight:300;font-size:15px'),
     B('Metro Tile','background:#2d89ef;color:#fff;border:none;padding:20px 24px;border-radius:0;font-family:Segoe UI,sans-serif;font-weight:100;font-size:18px;width:120px;text-align:left'),
   ]},
-  { category: 'Mac OS Classic', buttons: [
+  { category: 'Classic OS', buttons: [
     B('Chicago','background:#fff;color:#000;border:2px solid #000;padding:4px 18px;border-radius:14px;font-family:Chicago,Geneva,sans-serif;font-size:12px;box-shadow:2px 2px 0 #000'),
     B('Platinum','background:linear-gradient(180deg,#eee,#ccc);color:#000;border:1px solid #888;padding:3px 20px;border-radius:6px;font-family:Charcoal,Geneva,sans-serif;font-size:12px;box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,0.2)'),
     B('Aqua Gel','background:linear-gradient(180deg,#b8e4ff 0%,#5eb4f5 40%,#3a8fd9 50%,#4ba3e8 60%,#7fc4f5 100%);color:#fff;border:1px solid #2c7ac4;padding:6px 20px;border-radius:16px;font-family:Lucida Grande,sans-serif;font-size:13px;text-shadow:0 -1px 0 rgba(0,0,0,0.2);box-shadow:inset 0 1px 2px rgba(255,255,255,0.5),0 2px 4px rgba(0,0,0,0.2)'),
   ]},
-  { category: 'visionOS', buttons: [
+  { category: 'Classic OS', buttons: [
     B('visionOS Glass','background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:10px 24px;border-radius:22px;font-family:-apple-system,sans-serif;font-weight:500;font-size:15px;backdrop-filter:blur(40px)'),
     B('visionOS Tinted','background:rgba(0,122,255,0.2);color:#fff;border:1px solid rgba(0,122,255,0.3);padding:10px 24px;border-radius:22px;font-family:-apple-system,sans-serif;font-weight:500;font-size:15px;backdrop-filter:blur(40px)'),
     B('visionOS Solid','background:rgba(255,255,255,0.25);color:#fff;border:none;padding:10px 24px;border-radius:22px;font-family:-apple-system,sans-serif;font-weight:600;font-size:15px;backdrop-filter:blur(40px);box-shadow:0 2px 8px rgba(0,0,0,0.15)'),
   ]},
-  { category: 'BeOS / NeXT / Amiga', buttons: [
+  { category: 'Classic OS', buttons: [
     B('BeOS','background:#d8d0c8;color:#000;border-top:1px solid #f8f4f0;border-left:1px solid #f8f4f0;border-bottom:1px solid #908070;border-right:1px solid #908070;padding:4px 14px;border-radius:0;font-family:Swis721 BT,sans-serif;font-size:12px'),
     B('NeXT','background:#a0a0a0;color:#000;border-top:2px solid #d0d0d0;border-left:2px solid #d0d0d0;border-bottom:2px solid #505050;border-right:2px solid #505050;padding:3px 10px;border-radius:0;font-family:Helvetica,sans-serif;font-size:12px'),
     B('Amiga WB','background:#aaa;color:#000;border-top:2px solid #fff;border-left:2px solid #fff;border-bottom:2px solid #000;border-right:2px solid #000;padding:2px 12px;border-radius:0;font-family:Topaz,Courier New,monospace;font-size:13px'),
     B('OS/2 Warp','background:#c8c8c8;color:#000;border-top:1px solid #fff;border-left:1px solid #fff;border-bottom:1px solid #404040;border-right:1px solid #404040;padding:3px 12px;border-radius:0;font-family:Helv,Helvetica,sans-serif;font-size:12px;box-shadow:inset 1px 1px 0 #e8e8e8'),
     B('CDE/Motif','background:#aeb2c3;color:#000;border-top:2px solid #d6d9e4;border-left:2px solid #d6d9e4;border-bottom:2px solid #5d6069;border-right:2px solid #5d6069;padding:2px 10px;border-radius:0;font-family:Helvetica,sans-serif;font-weight:700;font-size:12px'),
   ]},
-  { category: 'GNOME / KDE', buttons: [
+  { category: 'Classic OS', buttons: [
     B('Adwaita','background:linear-gradient(180deg,#fafafa,#ededed);color:#2e3436;border:1px solid #cdc7c2;padding:6px 16px;border-radius:5px;font-family:Cantarell,sans-serif;font-weight:500;font-size:14px;box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,0.07)'),
     B('Adwaita Suggested','background:linear-gradient(180deg,#4a90d9,#3584d3);color:#fff;border:1px solid #2a6fb5;padding:6px 16px;border-radius:5px;font-family:Cantarell,sans-serif;font-weight:500;font-size:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.2),0 1px 2px rgba(0,0,0,0.1)'),
     B('Breeze','background:#eff0f1;color:#232627;border:1px solid #bcc0c4;padding:6px 16px;border-radius:3px;font-family:Noto Sans,sans-serif;font-size:13px'),
     B('Breeze Highlight','background:#3daee9;color:#fff;border:1px solid #2d9ed7;padding:6px 16px;border-radius:3px;font-family:Noto Sans,sans-serif;font-size:13px'),
   ]},
   // === CURATED: More Design Systems ===
-  { category: 'Atlassian', buttons: [
+  { category: 'Design Systems', buttons: [
     B('Primary','background:#0052cc;color:#fff;border:none;padding:6px 12px;border-radius:3px;font-family:-apple-system,sans-serif;font-weight:500;font-size:14px'),
     B('Default','background:rgba(9,30,66,0.04);color:#42526e;border:none;padding:6px 12px;border-radius:3px;font-family:-apple-system,sans-serif;font-weight:500;font-size:14px'),
     B('Warning','background:#ffab00;color:#172b4d;border:none;padding:6px 12px;border-radius:3px;font-family:-apple-system,sans-serif;font-weight:500;font-size:14px'),
     B('Danger','background:#de350b;color:#fff;border:none;padding:6px 12px;border-radius:3px;font-family:-apple-system,sans-serif;font-weight:500;font-size:14px'),
     B('Link','background:transparent;color:#0052cc;border:none;padding:6px 12px;border-radius:3px;font-family:-apple-system,sans-serif;font-weight:500;font-size:14px'),
   ]},
-  { category: 'Shopify Polaris', buttons: [
+  { category: 'Design Systems', buttons: [
     B('Primary','background:#303030;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-family:-apple-system,sans-serif;font-weight:600;font-size:13px;box-shadow:0 1px 0 0 rgba(0,0,0,0.08)'),
     B('Default','background:#fff;color:#303030;border:1px solid #c9cccf;padding:8px 16px;border-radius:8px;font-family:-apple-system,sans-serif;font-weight:600;font-size:13px;box-shadow:0 1px 0 0 rgba(0,0,0,0.05)'),
     B('Critical','background:#e51c00;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-family:-apple-system,sans-serif;font-weight:600;font-size:13px'),
     B('Plain','background:transparent;color:#005bd3;border:none;padding:4px 8px;border-radius:6px;font-family:-apple-system,sans-serif;font-weight:500;font-size:13px;text-decoration:underline'),
   ]},
-  { category: 'Salesforce Lightning', buttons: [
+  { category: 'Design Systems', buttons: [
     B('Brand','background:#0176d3;color:#fff;border:none;padding:8px 16px;border-radius:4px;font-family:Salesforce Sans,Arial,sans-serif;font-size:13px'),
     B('Neutral','background:#fff;color:#181818;border:1px solid #c9c9c9;padding:8px 16px;border-radius:4px;font-family:Salesforce Sans,Arial,sans-serif;font-size:13px'),
     B('Outline Brand','background:transparent;color:#0176d3;border:1px solid #0176d3;padding:8px 16px;border-radius:4px;font-family:Salesforce Sans,Arial,sans-serif;font-size:13px'),
     B('Destructive','background:#ba0517;color:#fff;border:none;padding:8px 16px;border-radius:4px;font-family:Salesforce Sans,Arial,sans-serif;font-size:13px'),
     B('Success','background:#2e844a;color:#fff;border:none;padding:8px 16px;border-radius:4px;font-family:Salesforce Sans,Arial,sans-serif;font-size:13px'),
   ]},
-  { category: 'SAP Fiori', buttons: [
+  { category: 'Design Systems', buttons: [
     B('Emphasized','background:#0a6ed1;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-family:72,Helvetica Neue,sans-serif;font-weight:700;font-size:14px'),
     B('Default','background:transparent;color:#0a6ed1;border:1px solid #0a6ed1;padding:6px 14px;border-radius:8px;font-family:72,Helvetica Neue,sans-serif;font-size:14px'),
     B('Transparent','background:transparent;color:#0a6ed1;border:none;padding:6px 14px;border-radius:8px;font-family:72,Helvetica Neue,sans-serif;font-size:14px'),
@@ -2503,7 +2541,7 @@ const BUTTON_CATALOG = [
     B('Attention','background:#e9730c;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-family:72,Helvetica Neue,sans-serif;font-weight:700;font-size:14px'),
   ]},
   // === CURATED: Skeuomorphic Textures ===
-  { category: 'Texture Buttons', buttons: [
+  { category: 'Textures', buttons: [
     B('Leather','background:#8b4513;color:#f5deb3;border:3px double #654321;padding:12px 24px;border-radius:8px;font-family:Georgia,serif;font-weight:700;text-shadow:0 1px 0 rgba(0,0,0,0.3);box-shadow:inset 0 0 10px rgba(0,0,0,0.3),0 2px 4px rgba(0,0,0,0.3)'),
     B('Denim','background:#2b5797;color:#f0e68c;border:2px dashed #87ceeb;padding:10px 24px;border-radius:6px;font-family:Courier New,monospace;font-weight:700;box-shadow:inset 0 0 8px rgba(0,0,0,0.3)'),
     B('Cardboard','background:#c4a882;color:#4a3520;border:none;padding:12px 24px;border-radius:2px;font-family:Courier New,monospace;font-weight:700;box-shadow:inset 0 0 12px rgba(0,0,0,0.15),2px 2px 4px rgba(0,0,0,0.2)'),
@@ -2513,46 +2551,46 @@ const BUTTON_CATALOG = [
     B('Gel Capsule','background:linear-gradient(180deg,#6eb9f7 0%,#1a73e8 50%,#0d5bba 51%,#1a73e8 100%);color:#fff;border:1px solid #0b4a9e;padding:10px 22px;border-radius:6px;font-weight:700;text-shadow:0 -1px 0 rgba(0,0,0,0.3);box-shadow:inset 0 1px 0 rgba(255,255,255,0.3),0 2px 4px rgba(0,0,0,0.3)'),
   ]},
   // === CURATED: Print & Editorial ===
-  { category: 'Letterpress', buttons: [
+  { category: 'Print & Editorial', buttons: [
     B('Impression','background:#d4c5a9;color:#5c4a32;border:none;padding:12px 24px;border-radius:0;font-family:Playfair Display,Georgia,serif;font-weight:700;text-shadow:0 1px 1px rgba(255,255,255,0.6);box-shadow:inset 0 2px 4px rgba(0,0,0,0.15);letter-spacing:2px;text-transform:uppercase'),
     B('Debossed Dark','background:#2c2c2c;color:#1a1a1a;border:none;padding:12px 24px;border-radius:0;font-family:Playfair Display,serif;font-weight:900;font-size:16px;text-shadow:0 1px 1px rgba(255,255,255,0.08);letter-spacing:3px;text-transform:uppercase'),
     B('Emboss Light','background:#d0d0d0;color:#d0d0d0;border:none;padding:12px 24px;border-radius:4px;font-weight:700;text-shadow:-1px -1px 1px rgba(255,255,255,0.8),1px 1px 1px rgba(0,0,0,0.3)'),
   ]},
-  { category: 'Newspaper / Magazine', buttons: [
+  { category: 'Print & Editorial', buttons: [
     B('Broadsheet','background:#fff8e7;color:#1a1a1a;border-top:3px double #000;border-bottom:3px double #000;border-left:none;border-right:none;padding:8px 20px;border-radius:0;font-family:Libre Baskerville,Times New Roman,serif;font-style:italic;letter-spacing:1px'),
     B('Classified','background:#f5ecd7;color:#000;border:1px solid #000;padding:6px 12px;border-radius:0;font-family:Courier New,monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.5px'),
     B('Vogue','background:transparent;color:#000;border:none;border-bottom:2px solid #000;padding:6px 2px;border-radius:0;font-family:Didot,Bodoni MT,Playfair Display,serif;font-size:18px;letter-spacing:6px;text-transform:uppercase'),
     B('Editorial Tag','background:#000;color:#fff;border:none;padding:4px 12px;border-radius:0;font-family:Helvetica Neue,Arial,sans-serif;font-weight:700;font-size:10px;letter-spacing:2px;text-transform:uppercase'),
     B('Chapter','background:transparent;color:#2c1810;border:none;border-top:1px solid #8b7355;border-bottom:1px solid #8b7355;padding:8px 16px;border-radius:0;font-family:Cormorant Garamond,Garamond,serif;font-weight:300;font-size:18px;letter-spacing:4px;text-transform:uppercase;font-variant:small-caps'),
   ]},
-  { category: 'Stamp / Ticket', buttons: [
+  { category: 'Print & Editorial', buttons: [
     B('Rubber Stamp','background:transparent;color:#cc0000;border:3px solid #cc0000;padding:8px 20px;border-radius:4px;font-family:Impact,sans-serif;font-size:16px;text-transform:uppercase;letter-spacing:3px;transform:rotate(-5deg);opacity:0.8'),
     B('Ticket Stub','background:#fff8dc;color:#8b0000;border:2px dashed #8b0000;padding:8px 20px;border-radius:0;font-family:Courier New,monospace;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:2px'),
     B('Typewriter','background:#fffef5;color:#222;border:1px solid #999;padding:6px 14px;border-radius:0;font-family:Special Elite,Courier New,monospace;font-size:14px'),
     B('Stencil','background:#2e4600;color:#c1d72e;border:none;padding:12px 24px;border-radius:0;font-family:Stencil,Impact,sans-serif;font-size:18px;text-transform:uppercase;letter-spacing:4px'),
   ]},
   // === CURATED: Game UI ===
-  { category: 'RPG / Fantasy', buttons: [
+  { category: 'Gaming', buttons: [
     B('Stone','background:linear-gradient(180deg,#8b7355,#6b5340,#5a432e);color:#f5deb3;border:3px solid #4a3728;padding:10px 24px;border-radius:4px;font-family:MedievalSharp,Palatino,serif;font-weight:700;text-shadow:1px 1px 2px rgba(0,0,0,0.5);box-shadow:inset 0 1px 0 rgba(255,255,255,0.15),0 3px 6px rgba(0,0,0,0.4)'),
     B('Gold Ornate','background:linear-gradient(180deg,#ffd700,#daa520,#b8860b);color:#2f1b00;border:2px solid #8b6914;padding:10px 24px;border-radius:6px;font-family:Cinzel,Palatino,serif;font-weight:700;text-transform:uppercase;letter-spacing:1px;text-shadow:0 1px 0 rgba(255,215,0,0.5);box-shadow:inset 0 1px 2px rgba(255,255,255,0.4),0 3px 8px rgba(0,0,0,0.4)'),
     B('Parchment','background:linear-gradient(180deg,#f5e6c8,#e8d5a8);color:#4a3728;border:2px solid #8b7355;padding:10px 24px;border-radius:2px;font-family:Cinzel,Garamond,serif;box-shadow:inset 0 0 10px rgba(139,115,85,0.2),2px 2px 6px rgba(0,0,0,0.2)'),
     B('Dark Souls','background:rgba(30,25,20,0.9);color:#c8b894;border:1px solid #5a4a38;padding:10px 28px;border-radius:0;font-family:EB Garamond,Garamond,serif;font-size:16px;letter-spacing:2px;text-shadow:0 0 4px rgba(200,184,148,0.3)'),
     B('WoW Bar','background:linear-gradient(180deg,#4a4238,#2a2420);color:#ffd100;border:2px solid #8b7355;padding:8px 16px;border-radius:3px;font-family:Palatino,serif;font-weight:700;font-size:12px;text-shadow:0 1px 2px rgba(0,0,0,0.8);box-shadow:inset 0 0 6px rgba(0,0,0,0.5)'),
   ]},
-  { category: 'Pixel / NES / SNES', buttons: [
+  { category: 'Retro Computing', buttons: [
     B('8-Bit','background:#5b8c3e;color:#fff;border:4px solid #000;padding:8px 20px;border-radius:0;font-family:Press Start 2P,Courier New,monospace;font-size:10px;text-transform:uppercase;box-shadow:inset -4px -4px 0 #3a6b22,inset 4px 4px 0 #7caf5c'),
     B('NES','background:#fcfcfc;color:#000;border:3px solid #000;padding:6px 16px;border-radius:0;font-family:Press Start 2P,monospace;font-size:8px;text-transform:uppercase;box-shadow:3px 3px 0 #000'),
     B('SNES','background:linear-gradient(180deg,#4040a0,#202060);color:#fff;border:2px solid #8080c0;padding:6px 20px;border-radius:0;font-family:Press Start 2P,monospace;font-size:9px;box-shadow:inset 1px 1px 0 #6060b0,inset -1px -1px 0 #101040'),
     B('Insert Coin','background:#220000;color:#ff4444;border:2px solid #ff4444;padding:12px 28px;border-radius:0;font-family:Press Start 2P,monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;text-shadow:0 0 8px #ff4444;box-shadow:0 0 10px rgba(255,68,68,0.3)'),
     B('Pac-Man','background:#000;color:#ffff00;border:3px solid #ffff00;padding:10px 24px;border-radius:50px;font-family:Press Start 2P,monospace;font-size:10px;text-transform:uppercase;text-shadow:0 0 6px #ffff00'),
   ]},
-  { category: 'Mass Effect / Horror', buttons: [
+  { category: 'Gaming', buttons: [
     B('Mass Effect','background:linear-gradient(90deg,rgba(255,100,0,0.8),rgba(255,60,0,0.6));color:#fff;border:none;border-left:3px solid #ff6600;padding:8px 20px;border-radius:0;font-family:Exo 2,sans-serif;font-weight:300;text-transform:uppercase;letter-spacing:1.5px'),
     B('Blood Drip','background:#1a0000;color:#cc0000;border:2px solid #660000;padding:12px 24px;border-radius:0;font-family:Creepster,Impact,sans-serif;font-size:16px;text-shadow:0 0 8px rgba(204,0,0,0.5),0 2px 4px rgba(0,0,0,0.8);box-shadow:inset 0 -4px 8px rgba(100,0,0,0.5)'),
     B('Checkered','background:repeating-conic-gradient(#000 0% 25%,#fff 0% 50%) 0 0/20px 20px;color:#ff0000;border:3px solid #ff0000;padding:10px 24px;border-radius:0;font-family:Impact,sans-serif;font-size:16px;text-shadow:1px 1px 0 #000,-1px -1px 0 #000;text-transform:uppercase'),
   ]},
   // === CURATED: Nature & Organic Shapes ===
-  { category: 'Nature Shapes', buttons: [
+  { category: 'Shapes & Geometry', buttons: [
     B('Leaf','background:linear-gradient(135deg,#56ab2f,#a8e063);color:#fff;border:none;padding:10px 24px;border-radius:30px 5px 30px 5px;font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,0.2)'),
     B('Water Drop','background:radial-gradient(circle at 30% 30%,rgba(255,255,255,0.4),rgba(66,165,245,0.8));color:#fff;border:none;padding:14px 24px;border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;font-weight:600;box-shadow:0 4px 12px rgba(66,165,245,0.4)'),
     B('Lava','background:linear-gradient(180deg,#ff4500,#8b0000);color:#ffd700;border:2px solid #ff6347;padding:12px 24px;border-radius:4px;font-weight:800;text-shadow:0 0 8px rgba(255,69,0,0.6);box-shadow:0 0 15px rgba(255,69,0,0.3),inset 0 0 10px rgba(0,0,0,0.2)'),
@@ -2561,26 +2599,26 @@ const BUTTON_CATALOG = [
     B('Aurora','background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);color:#7fffd4;border:1px solid rgba(127,255,212,0.3);padding:12px 24px;border-radius:8px;font-weight:500;text-shadow:0 0 10px rgba(127,255,212,0.3)'),
   ]},
   // === CURATED: More Clip-Path Shapes ===
-  { category: 'Shield / Chevron', buttons: [
+  { category: 'Shapes & Geometry', buttons: [
     B('Shield','background:#1565c0;color:#fff;border:none;padding:16px 24px 24px;clip-path:polygon(0 0,100% 0,100% 70%,50% 100%,0 70%);font-weight:700;text-transform:uppercase'),
     B('Chamfered','background:#455a64;color:#fff;border:none;padding:12px 24px;clip-path:polygon(12px 0,calc(100% - 12px) 0,100% 12px,100% calc(100% - 12px),calc(100% - 12px) 100%,12px 100%,0 calc(100% - 12px),0 12px);font-weight:600'),
     B('Ticket Notch','background:#ff5722;color:#fff;border:none;padding:12px 28px;clip-path:polygon(0 0,100% 0,100% calc(50% - 8px),calc(100% - 8px) 50%,100% calc(50% + 8px),100% 100%,0 100%,0 calc(50% + 8px),8px 50%,0 calc(50% - 8px));font-weight:600'),
     B('Breadcrumb','background:#eceff1;color:#455a64;border:none;padding:6px 24px 6px 12px;border-radius:0;font-weight:500;font-size:13px;clip-path:polygon(0 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,0 100%,10px 50%)'),
   ]},
   // === CURATED: Cultural Styles ===
-  { category: 'Chinese / Egyptian / Greek', buttons: [
+  { category: 'Cultural', buttons: [
     B('Vermillion Seal','background:#cc3333;color:#ffd700;border:2px solid #990000;padding:10px 24px;border-radius:2px;font-family:Noto Serif,serif;font-weight:700;box-shadow:inset 0 0 6px rgba(0,0,0,0.2)'),
     B('Pharaoh','background:linear-gradient(180deg,#c9a94e,#a07e30);color:#1a0a00;border:2px solid #8b6914;padding:10px 28px;border-radius:0;font-family:Cinzel,serif;font-weight:700;letter-spacing:3px;text-transform:uppercase'),
     B('Ionic Column','background:#fafafa;color:#1a237e;border-top:3px solid #1a237e;border-bottom:3px solid #1a237e;border-left:none;border-right:none;padding:10px 24px;border-radius:0;font-family:EB Garamond,serif;font-size:15px;letter-spacing:3px;text-transform:uppercase'),
   ]},
   // === CURATED: Pop Art / Bauhaus ===
-  { category: 'Pop Art', buttons: [
+  { category: 'Art Movements', buttons: [
     B('Halftone','background:#ffff00;color:#000;border:3px solid #000;padding:12px 24px;border-radius:0;font-family:Bangers,Impact,sans-serif;font-size:18px;text-transform:uppercase;box-shadow:4px 4px 0 #ff1493'),
     B('Ben-Day Dots','background:radial-gradient(circle,#ff69b4 20%,transparent 20%) 0 0/10px 10px,#ffd700;color:#000;border:3px solid #000;padding:12px 24px;border-radius:0;font-family:Bangers,sans-serif;font-size:16px;text-transform:uppercase'),
     B('Bauhaus','background:#dd1c1a;color:#fff;border:none;padding:12px 24px;border-radius:50% / 30%;font-family:Futura,Nunito,sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:2px'),
   ]},
   // === CURATED: Interactive / Micro-Interaction Patterns ===
-  { category: 'Interaction Ready', buttons: [
+  { category: 'Interactive', buttons: [
     B('3D Press','background:#e53935;color:#fff;border:none;padding:12px 24px;border-radius:6px;font-weight:700;box-shadow:0 6px 0 #b71c1c,0 8px 12px rgba(0,0,0,0.3);transform:translateY(-2px);transition:all 0.1s'),
     B('Magnetic Ring','background:#000;color:#fff;border:none;padding:12px 24px;border-radius:50px;font-weight:600;outline:2px solid #fff;outline-offset:4px;transition:outline-offset 0.3s'),
     B('Corner Dots','background:transparent;color:#333;border:1px solid #333;padding:14px 28px;border-radius:0;font-weight:600;box-shadow:4px 4px 0 0 #333,-4px -4px 0 0 #333,4px -4px 0 0 #333,-4px 4px 0 0 #333'),
@@ -2598,7 +2636,7 @@ const BUTTON_CATALOG = [
     B('Autumn','background:linear-gradient(135deg,#d35400,#e74c3c,#c0392b);color:#fff;border:none;padding:10px 24px;border-radius:4px;font-weight:700'),
   ]},
   // === CURATED: Code Editor / Dev Tools ===
-  { category: 'Dev Tools', buttons: [
+  { category: 'Retro Computing', buttons: [
     B('VS Code','background:#0e639c;color:#fff;border:none;padding:4px 14px;border-radius:2px;font-family:Segoe UI,sans-serif;font-size:13px'),
     B('GitHub Code','background:#f6f8fa;color:#24292f;border:1px solid #d0d7de;padding:4px 12px;border-radius:6px;font-family:SFMono-Regular,Consolas,monospace;font-size:12px'),
     B('Stack Overflow','background:#f48024;color:#fff;border:1px solid transparent;padding:10px 12px;border-radius:6px;font-family:-apple-system,Segoe UI,sans-serif;font-size:13px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.4)'),
@@ -2606,21 +2644,21 @@ const BUTTON_CATALOG = [
     B('Bash Prompt','background:#2d2d2d;color:#d4d4d4;border:1px solid #404040;padding:6px 14px;border-radius:4px;font-family:SF Mono,Fira Code,monospace;font-size:13px'),
   ]},
   // === CURATED: Swiss / International ===
-  { category: 'Swiss Design', buttons: [
+  { category: 'Print & Editorial', buttons: [
     B('Red Accent','background:#fff;color:#000;border:none;border-left:4px solid #ff0000;padding:10px 16px;border-radius:0;font-family:Helvetica Neue,Arial,sans-serif;font-weight:300;letter-spacing:1px;text-transform:uppercase'),
     B('Grid Rule','background:transparent;color:#333;border:none;border-bottom:1px solid #333;padding:8px 0;border-radius:0;font-family:Helvetica Neue,sans-serif;font-weight:300'),
     B('Bold Block','background:#000;color:#fff;border:none;padding:16px 32px;border-radius:0;font-family:Helvetica Neue,sans-serif;font-weight:900;font-size:11px;text-transform:uppercase;letter-spacing:4px'),
     B('Dot Minimal','background:transparent;color:#333;border:none;padding:8px 16px;border-radius:0;font-family:Helvetica Neue,sans-serif;font-weight:300'),
   ]},
   // === CURATED: Anti-Design / Experimental ===
-  { category: 'Anti-Design', buttons: [
+  { category: 'Art Movements', buttons: [
     B('Distortion','background:#ff00ff;color:#000;border:3px solid #000;padding:10px 20px;border-radius:0;font-family:Impact,sans-serif;font-size:20px;transform:rotate(-2deg) skewX(-3deg);box-shadow:5px 5px 0 #00ffff'),
     B('Mismatch','background:#bada55;color:#000;border-top:6px solid #ff0000;border-right:2px dashed #0000ff;border-bottom:4px dotted #000;border-left:1px solid #000;padding:15px 20px;border-radius:30px 0 30px 0;font-family:Comic Sans MS,cursive'),
     B('Stacked Offset','background:#fff;color:#000;border:2px solid #000;padding:12px 24px;border-radius:0;font-weight:700;box-shadow:4px 4px 0 #ff6347,8px 8px 0 #000'),
     B('Double Block','background:#fff;color:#000;border:2px solid #000;padding:12px 24px;border-radius:0;font-weight:900;text-transform:uppercase;outline:2px solid #000;outline-offset:4px'),
   ]},
   // === CURATED: Synthwave / Tron / Matrix ===
-  { category: 'Synthwave / Tron', buttons: [
+  { category: 'Cyberpunk', buttons: [
     B('Synthwave','background:linear-gradient(180deg,#2b1055,#090116);color:#ff6ec7;border:1px solid #ff6ec7;padding:12px 24px;border-radius:0;font-family:Audiowide,sans-serif;text-transform:uppercase;letter-spacing:3px;text-shadow:0 0 10px rgba(255,110,199,0.5);box-shadow:0 4px 0 #ff6ec7'),
     B('Tron','background:#0c141f;color:#6fc3df;border:1px solid #6fc3df;padding:10px 24px;border-radius:0;font-family:Orbitron,sans-serif;font-size:12px;text-transform:uppercase;letter-spacing:4px;box-shadow:0 0 5px rgba(111,195,223,0.3),inset 0 0 5px rgba(111,195,223,0.1)'),
     B('Matrix','background:#000;color:#00ff41;border:1px solid #003b00;padding:10px 24px;border-radius:0;font-family:Courier New,monospace;font-weight:700;text-shadow:0 0 5px #00ff41,0 0 10px #00ff41'),
@@ -2628,7 +2666,7 @@ const BUTTON_CATALOG = [
     B('Energy Shield','background:transparent;color:#7df9ff;border:2px solid #7df9ff;padding:10px 24px;font-family:Rajdhani,sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:2px;text-shadow:0 0 6px rgba(125,249,255,0.5);box-shadow:0 0 8px rgba(125,249,255,0.3)'),
   ]},
   // === CURATED: Accessibility ===
-  { category: 'WCAG Accessible', buttons: [
+  { category: 'Accessibility', buttons: [
     B('HC Yellow/Black','background:#000;color:#ffff00;border:3px solid #ffff00;padding:14px 28px;border-radius:4px;font-weight:700;font-size:18px'),
     B('HC White/Black','background:#fff;color:#000;border:2px solid #000;padding:14px 28px;border-radius:0;font-weight:700;font-size:18px'),
     B('Double Focus','background:#0052cc;color:#fff;border:none;padding:12px 24px;border-radius:4px;font-weight:600;font-size:16px;outline:3px solid #fff;outline-offset:2px;box-shadow:0 0 0 6px #0052cc'),
@@ -2851,6 +2889,7 @@ function getAllVisibleButtons() {
       });
     }
   }
+  result.forEach((item, i) => item.globalIdx = i);
   return result;
 }
 
@@ -2885,25 +2924,25 @@ function renderButtonCanvas() {
     return;
   }
 
-  // Group by category
+  // Group by category name (merges renamed categories)
   const groups = {};
   for (const b of allBtns) {
-    if (!groups[b.catIdx]) groups[b.catIdx] = { category: b.category, dark: b.dark, buttons: [] };
-    groups[b.catIdx].buttons.push(b);
+    if (!groups[b.category]) groups[b.category] = { category: b.category, dark: b.dark, buttons: [] };
+    groups[b.category].buttons.push(b);
   }
 
-  let count = 0;
-  canvas.innerHTML = Object.entries(groups).map(([catIdx, g]) => {
+  const entries = Object.entries(groups);
+  const totalCount = entries.reduce((s, [, g]) => s + g.buttons.length, 0);
+  const btnScale = currentScale / 48;
+
+  function buildCatHtml([catIdx, g]) {
     const darkBg = g.dark ? ' dark-bg' : '';
-    count += g.buttons.length;
     return `<div class="btn-cat-section" data-cat-idx="${catIdx}">
       <div class="btn-cat-header">${g.category} <span style="font-weight:400;color:#aaa">${g.buttons.length}</span></div>
-      <div class="btn-cat-grid${darkBg}">${g.buttons.map((b, i) => {
-        const globalIdx = allBtns.indexOf(b);
-        const btnScale = currentScale / 48;
+      <div class="btn-cat-grid${darkBg}">${g.buttons.map(b => {
         const btnId = b.id || `${b.catIdx}:${b.btnIdx}`;
         const bLiked = likedButtons.has(btnId);
-        return `<div class="grid-item-wrap" onclick="openButtonSingle(${globalIdx})">
+        return `<div class="grid-item-wrap" onclick="openButtonSingle(${b.globalIdx})">
           <div class="grid-item-rate">
             <button onclick="event.stopPropagation();rateButton('${btnId}','minus')" title="Hide">&minus;</button>
             <button class="${bLiked ? 'liked' : ''}" onclick="event.stopPropagation();rateButton('${btnId}','plus')" title="${bLiked ? 'Unlike' : 'Like'}">&plus;</button>
@@ -2911,10 +2950,30 @@ function renderButtonCanvas() {
           ${renderBtnHtml(b.btn, btnScale)}</div>`;
       }).join('')}</div>
     </div>`;
-  }).join('');
-  canvas.insertAdjacentHTML('afterbegin',
-    `<div style="font-size:12px;color:var(--muted);margin-bottom:16px">${count} button styles across ${Object.keys(groups).length} categories</div>`);
-  setupScrollSync(canvas, 'button');
+  }
+
+  // Render first batch immediately, rest progressively
+  const FIRST_BATCH = 6;
+  const firstHtml = entries.slice(0, FIRST_BATCH).map(buildCatHtml).join('');
+  canvas.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-bottom:16px">${totalCount} button styles across ${entries.length} categories</div>` + firstHtml;
+
+  if (entries.length > FIRST_BATCH) {
+    const remaining = entries.slice(FIRST_BATCH);
+    let i = 0;
+    const CHUNK = 4;
+    const renderToken = ++renderBatchToken;
+    function renderChunk() {
+      if (renderToken !== renderBatchToken) return; // stale render
+      const chunk = remaining.slice(i, i + CHUNK);
+      if (!chunk.length) { setupScrollSync(canvas, 'button'); return; }
+      canvas.insertAdjacentHTML('beforeend', chunk.map(buildCatHtml).join(''));
+      i += CHUNK;
+      requestAnimationFrame(() => setTimeout(renderChunk, 0));
+    }
+    requestAnimationFrame(renderChunk);
+  } else {
+    setupScrollSync(canvas, 'button');
+  }
 }
 
 function renderButtonSingleView(canvas, allBtns) {
@@ -2942,7 +3001,7 @@ function renderButtonSingleView(canvas, allBtns) {
     canvas.innerHTML = `<div class="single-view">
       <div class="single-set-name">${c.category}</div>
       <div class="versions-grid" style="max-width:${Math.max(900, (currentScale * 2 + 40) * 4)}px">${catBtns.map((b, i) => {
-        const globalIdx = allBtns.indexOf(b);
+        const globalIdx = b.globalIdx;
         const isCurrent = globalIdx === buttonSingleIndex;
         const btnScale = currentScale / 48;
         return `<div class="version-card${isCurrent ? ' current' : ''}" onclick="openButtonSingle(${globalIdx})" style="${isCurrent ? 'background:var(--hover)' : ''}">
@@ -3073,6 +3132,7 @@ function getAllVisibleLoading() {
       });
     }
   }
+  result.forEach((item, i) => item.globalIdx = i);
   return result;
 }
 
@@ -3104,7 +3164,7 @@ function renderLoadingCanvas() {
     return `<div class="btn-cat-section" data-cat-idx="${catIdx}">
       <div class="btn-cat-header">${g.category} <span style="font-weight:400;color:#aaa">${g.items.length}</span></div>
       <div class="btn-cat-grid${darkBg}">${g.items.map(b => {
-        const globalIdx = allItems.indexOf(b);
+        const globalIdx = b.globalIdx;
         const lid = b.id || `${b.catIdx}:${b.btnIdx}`;
         const lLiked = likedLoading.has(lid);
         return `<div class="grid-item-wrap" style="padding:12px" onclick="openLoadingSingle(${globalIdx})">
@@ -3139,7 +3199,7 @@ function renderLoadingSingleView(canvas, allItems) {
     canvas.innerHTML = `<div class="single-view">
       <div class="single-set-name">${c.category}</div>
       <div class="versions-grid" style="max-width:${Math.max(900, (currentScale * 2 + 40) * 4)}px">${catItems.map((b, i) => {
-        const gi = allItems.indexOf(b);
+        const gi = b.globalIdx;
         const cur = gi === loadingSingleIndex;
         return `<div class="version-card${cur ? ' current' : ''}" onclick="openLoadingSingle(${gi})" style="${cur ? 'background:var(--hover)' : ''}">
           ${renderLoadingHtml(b.btn, loadScale)}
@@ -3705,23 +3765,28 @@ document.addEventListener('keydown', e => {
 });
 
 function navButtonCat(dir) {
-  // Build filtered list of category indices
-  const cats = [];
+  // Build filtered list of unique category names
+  const seen = new Set();
+  const catNames = [];
   BUTTON_CATALOG.forEach((cat, i) => {
+    if (hiddenButtonCats.has(i)) return;
+    if (seen.has(cat.category)) return;
+    seen.add(cat.category);
     if (searchFilter) {
       const catMatch = cat.category.toLowerCase().includes(searchFilter);
       const hasMatch = cat.buttons.some(b => catMatch || b.label.toLowerCase().includes(searchFilter));
       if (!hasMatch) return;
     }
-    cats.push(i);
+    catNames.push(cat.category);
   });
-  if (!cats.length) return;
-  const currentIdx = activeButtonCats.size === 1 ? [...activeButtonCats][0] : -1;
-  let pos = cats.indexOf(currentIdx);
+  if (!catNames.length) return;
+  // Find current category name
+  const currentName = activeButtonCats.size > 0 ? BUTTON_CATALOG[[...activeButtonCats][0]]?.category : null;
+  let pos = currentName ? catNames.indexOf(currentName) : -1;
   pos += dir;
-  if (pos < 0) pos = cats.length - 1;
-  if (pos >= cats.length) pos = 0;
-  loadButtonCat(cats[pos]);
+  if (pos < 0) pos = catNames.length - 1;
+  if (pos >= catNames.length) pos = 0;
+  loadButtonCatGroup(catNames[pos]);
   const el = document.querySelector('.set-item.active');
   if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
