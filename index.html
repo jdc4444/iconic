@@ -811,7 +811,7 @@ const iconCache = {}; // prefix -> [icon names]
 let renderBatchToken = 0; // cancels stale chunked renders
 let currentAnim = null; // current animation class name or null
 const ANIM_LIST = ['anim-pulse','anim-spin','anim-bounce','anim-shimmer','anim-glow','anim-fade','anim-shake','anim-float','anim-flip','anim-wiggle','anim-pop','anim-slide'];
-let animCycleTimer = null;
+// no auto-cycle timer
 let likedAnims = new Set();
 let hiddenAnims = new Set();
 
@@ -3766,30 +3766,34 @@ function animSetByIndex(idx) {
 }
 
 function animNext() {
-  // Skip to next animation, let it loop on its own
-  if (animIdx < 0) animIdx = -1;
-  animSetByIndex(nextVisibleAnim(animIdx));
-  if (!animPaused) restartAnimTimer();
+  // Right: if paused, start playing current. If playing, skip to next.
+  if (animPaused) {
+    animPaused = false;
+    if (animIdx < 0) animIdx = 0;
+    animSetByIndex(animIdx);
+  } else {
+    animSetByIndex(nextVisibleAnim(animIdx));
+  }
+  updateAnimUI();
 }
 
 function animPrev() {
-  // Skip to previous animation, let it loop on its own
+  // Left: navigate back. Keep current play state.
   if (animIdx < 0) animIdx = 0;
   animSetByIndex(prevVisibleAnim(animIdx));
-  if (!animPaused) restartAnimTimer();
 }
 
 function animTogglePause() {
   animPaused = !animPaused;
   if (animPaused) {
-    // Stop auto-cycling, but keep current animation looping visually
-    clearInterval(animCycleTimer);
-    animCycleTimer = null;
+    // Stop playback — remove animation entirely
+    currentAnim = null;
+    applyAnim();
   } else {
-    // Start auto-cycling through animations
+    // Resume — apply current animation
     if (animIdx < 0) animIdx = 0;
-    animSetByIndex(animIdx);
-    restartAnimTimer();
+    currentAnim = ANIM_LIST[animIdx];
+    applyAnim();
   }
   updateAnimUI();
 }
@@ -3812,20 +3816,13 @@ function prevVisibleAnim(from) {
   return from;
 }
 
-function restartAnimTimer() {
-  clearInterval(animCycleTimer);
-  animCycleTimer = setInterval(() => {
-    animIdx = nextVisibleAnim(animIdx);
-    currentAnim = ANIM_LIST[animIdx];
-    applyAnim();
-    updateAnimUI();
-  }, 3000);
-}
+// No auto-cycle timer needed — ‹/› navigate manually
 
 function updateAnimUI() {
   const label = document.getElementById('animLabel');
   const pauseBtn = document.getElementById('animPause');
-  if (label) label.textContent = currentAnim ? currentAnim.replace('anim-','') : '';
+  const animName = animIdx >= 0 ? ANIM_LIST[animIdx] : null;
+  if (label) label.textContent = animName ? animName.replace('anim-','') : '';
   if (pauseBtn) {
     pauseBtn.textContent = animPaused ? '⏸' : '▶';
     pauseBtn.classList.toggle('active', animPaused);
@@ -3834,13 +3831,13 @@ function updateAnimUI() {
   const likeBtn = document.getElementById('animLike');
   const hideBtn = document.getElementById('animHide');
   if (likeBtn && hideBtn) {
-    const show = !!currentAnim;
+    const show = !!animName;
     likeBtn.style.display = show ? '' : 'none';
     hideBtn.style.display = show ? '' : 'none';
     if (show) {
-      likeBtn.textContent = likedAnims.has(currentAnim) ? '♥' : '+';
-      likeBtn.style.color = likedAnims.has(currentAnim) ? '#e53935' : '';
-      hideBtn.textContent = hiddenAnims.has(currentAnim) ? '↩' : '−';
+      likeBtn.textContent = likedAnims.has(animName) ? '♥' : '+';
+      likeBtn.style.color = likedAnims.has(animName) ? '#e53935' : '';
+      hideBtn.textContent = hiddenAnims.has(animName) ? '↩' : '−';
     }
   }
 }
@@ -4082,7 +4079,7 @@ function applyState(s) {
   if (s.activeSet) { activeSets.clear(); activeSets.add(s.activeSet); }
   if (s.activeButtonCat != null) { activeButtonCats.clear(); activeButtonCats.add(s.activeButtonCat); }
   if (s.activeLoadingCat != null) { activeLoadingCats.clear(); activeLoadingCats.add(s.activeLoadingCat); }
-  if (s.animIdx != null && s.animIdx >= 0) { animIdx = s.animIdx; currentAnim = ANIM_LIST[animIdx]; animPaused = true; }
+  if (s.animIdx != null && s.animIdx >= 0) { animIdx = s.animIdx; animPaused = true; currentAnim = null; }
   if (s.likedAnims) s.likedAnims.forEach(a => likedAnims.add(a));
   if (s.hiddenAnims) s.hiddenAnims.forEach(a => hiddenAnims.add(a));
   if (s.sidebarWidth) sidebar.style.width = s.sidebarWidth;
