@@ -739,8 +739,8 @@
       </div>
       <div class="view-toggle" id="animToggle" style="margin-left:8px;gap:0">
         <button onclick="animPrev()" title="Previous animation" style="border-radius:3px 0 0 3px">‹</button>
-        <button class="active" id="animPause" onclick="animTogglePause()" title="Pause" style="border-radius:0;border-left:none;border-right:none">⏸</button>
-        <button onclick="animNext()" title="Next animation" style="border-radius:0 3px 3px 0">›</button>
+        <button class="active" id="animPause" onclick="animTogglePause()" title="Pause/Stop" style="border-radius:0;border-left:none;border-right:none">⏸</button>
+        <button id="animRight" onclick="animNext()" title="Play / Next animation" style="border-radius:0 3px 3px 0">›</button>
         <span id="animLabel" style="font-size:9px;color:var(--muted);min-width:40px;text-align:center;padding:0 4px;align-self:center"></span>
       </div>
       <div class="view-toggle" style="margin-left:auto">
@@ -3761,11 +3761,21 @@ function animSetByIndex(idx) {
 }
 
 function animNext() {
-  animSetByIndex((animIdx + 1) % ANIM_LIST.length);
-  if (!animPaused) restartAnimTimer();
+  // Right arrow: if paused, start playing. If playing, skip forward.
+  if (animPaused) {
+    animPaused = false;
+    if (animIdx < 0) animIdx = 0;
+    animSetByIndex(animIdx);
+    restartAnimTimer();
+  } else {
+    animSetByIndex((animIdx + 1) % ANIM_LIST.length);
+    restartAnimTimer();
+  }
+  updateAnimUI();
 }
 
 function animPrev() {
+  // Left arrow: navigate back, don't change play/pause state
   animSetByIndex(animIdx <= 0 ? ANIM_LIST.length - 1 : animIdx - 1);
   if (!animPaused) restartAnimTimer();
 }
@@ -3798,8 +3808,13 @@ function updateAnimUI() {
   const pauseBtn = document.getElementById('animPause');
   if (label) label.textContent = currentAnim ? currentAnim.replace('anim-','') : '';
   if (pauseBtn) {
-    pauseBtn.textContent = animPaused ? '⏸' : '▶';
+    pauseBtn.textContent = '⏸';
     pauseBtn.classList.toggle('active', animPaused);
+  }
+  // Right arrow shows play state
+  const rightBtn = document.getElementById('animRight');
+  if (rightBtn) {
+    rightBtn.classList.toggle('active', !animPaused);
   }
 }
 
