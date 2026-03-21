@@ -3559,7 +3559,7 @@ function renderIconGrid(canvas, sets) {
   const gridStyle = isAllOrSearch
     ? 'flex-direction:row;align-content:flex-start;max-height:none'
     : '';
-  const cap = isAllOrSearch ? ALL_MODE_ICON_CAP : 0;
+  const cap = (activeSets.has('__all__') && !searchFilter) ? ALL_MODE_ICON_CAP : 0;
 
   allVisibleIcons = [];
 
@@ -3613,7 +3613,7 @@ function appendSetToCanvas(canvas, s) {
   const cellSize = Math.max(currentScale + 8, 28);
   const gridStyle = 'flex-direction:row;align-content:flex-start;max-height:none';
   const isAllOrSearch = activeSets.has('__all__') || !!searchFilter;
-  const cap = isAllOrSearch ? ALL_MODE_ICON_CAP : 0;
+  const cap = (activeSets.has('__all__') && !searchFilter) ? ALL_MODE_ICON_CAP : 0;
   const { html, icons } = buildSetHtml(s, gridStyle, cellSize, cap);
   if (!html) return;
   icons.forEach(ic => allVisibleIcons.push(ic));
