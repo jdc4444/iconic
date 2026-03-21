@@ -22,7 +22,9 @@
     "mdi",
     "heroicons"
   ],
-  "hiddenSets": [],
+  "hiddenSets": [
+    "academicons"
+  ],
   "likedButtons": [],
   "hiddenButtons": [
     "158:0",
@@ -44,7 +46,7 @@
   "hiddenLoadingCatsList": [
     11
   ],
-  "activeSet": null,
+  "activeSet": "akar-icons",
   "activeButtonCat": null,
   "activeLoadingCat": null,
   "animIdx": 1,

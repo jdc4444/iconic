@@ -726,7 +726,7 @@
     <div class="sidebar-sort" id="sidebarControls"></div>
     <div class="set-list" id="setList"></div>
     <div class="sidebar-search">
-      <input type="text" id="searchInput" placeholder="Search sets..." oninput="filterSets(this.value)">
+      <input type="text" id="searchInput" placeholder="Search sets..." oninput="filterSets(this.value)" onkeydown="if(event.key==='Enter'){filterSetsExact();event.preventDefault()}">
       <div id="searchFilters" class="search-filters"></div>
     </div>
     <div class="keyboard-hint">
@@ -797,6 +797,7 @@ let currentView = 'grid';
 let singleIndex = 0;
 let allVisibleIcons = [];
 let searchFilter = '';
+let searchExact = false; // true after Enter — word-boundary match
 let sortMode = 'category'; // 'category' or 'name'
 let selectedVariant = null; // specific variant in single view
 let activeFilter = null; // null, 'color', 'animated', 'liked', etc.
@@ -902,12 +903,12 @@ function renderSidebar() {
 
   let filtered = searchFilter
     ? SETS.filter(s => {
-        if (s.name.toLowerCase().includes(searchFilter) || s.author.toLowerCase().includes(searchFilter) || s.tier.toLowerCase().includes(searchFilter)) return true;
+        if (searchMatch(s.name.toLowerCase(), searchFilter) || searchMatch(s.author.toLowerCase(), searchFilter) || searchMatch(s.tier.toLowerCase(), searchFilter)) return true;
         // Also match if any cached icon name contains the search term
         const cached = iconCache[s.prefix];
-        if (cached) return cached.some(name => name.toLowerCase().includes(searchFilter));
+        if (cached) return cached.some(name => searchMatch(name.toLowerCase(), searchFilter));
         // Check sample icons as fallback
-        return s.sample.some(name => name.toLowerCase().includes(searchFilter));
+        return s.sample.some(name => searchMatch(name.toLowerCase(), searchFilter));
       })
     : [...SETS];
 
@@ -956,9 +957,9 @@ function renderButtonSidebar(el) {
     if (hiddenButtonCats.has(i)) return;
     const name = cat.category;
     if (!byName[name]) byName[name] = { name, indices: [], count: 0, dark: cat.dark };
-    const catMatch = name.toLowerCase().includes(searchFilter);
+    const catMatch = searchMatch(name.toLowerCase(), searchFilter);
     const matchingBtns = searchFilter
-      ? cat.buttons.filter(b => catMatch || b.label.toLowerCase().includes(searchFilter))
+      ? cat.buttons.filter(b => catMatch || searchMatch(b.label.toLowerCase(), searchFilter))
       : cat.buttons;
     if (searchFilter && matchingBtns.length === 0) return;
     byName[name].indices.push(i);
@@ -1077,8 +1078,23 @@ function loadButtonCat(idx) {
 
 function filterSets(q) {
   searchFilter = q.toLowerCase();
+  searchExact = false;
   renderSidebar();
   renderCanvas();
+}
+
+function filterSetsExact() {
+  if (!searchFilter) return;
+  searchExact = true;
+  renderSidebar();
+  renderCanvas();
+}
+
+// Word-boundary match: "car" matches "car", "car-door", "toy-car" but NOT "card", "cardinal"
+function searchMatch(text, query) {
+  if (!searchExact) return text.includes(query);
+  const re = new RegExp('(^|[\\s\\-_/])' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[\\s\\-_/])', 'i');
+  return re.test(text);
 }
 
 function toggleShowAll() {
@@ -1237,7 +1253,7 @@ async function fetchIcons(prefix) {
 function getIcons(s) {
   const icons = iconCache[s.prefix] || s.sample;
   if (searchFilter) {
-    return icons.filter(name => name.toLowerCase().includes(searchFilter));
+    return icons.filter(name => searchMatch(name.toLowerCase(), searchFilter));
   }
   return icons;
 }
@@ -2950,11 +2966,11 @@ function getAllVisibleButtons() {
   if (searchFilter) {
     BUTTON_CATALOG.forEach((cat, idx) => {
       if (hiddenButtonCats.has(idx)) return;
-      const catMatch = cat.category.toLowerCase().includes(searchFilter);
+      const catMatch = searchMatch(cat.category.toLowerCase(), searchFilter);
       cat.buttons.forEach((b, bi) => {
         const btnId = `${idx}:${bi}`;
         if (hiddenButtonItems.has(btnId)) return;
-        if (catMatch || b.label.toLowerCase().includes(searchFilter)) {
+        if (catMatch || searchMatch(b.label.toLowerCase(), searchFilter)) {
           result.push({ catIdx: idx, btnIdx: bi, btn: b, category: cat.category, dark: !!cat.dark, id: btnId });
         }
       });
@@ -3148,9 +3164,9 @@ function renderLoadingSidebar(el) {
   let filtered = [];
   LOADING_CATALOG.forEach((cat, i) => {
     if (hiddenLoadingCats.has(i)) return;
-    const catMatch = cat.category.toLowerCase().includes(searchFilter);
+    const catMatch = searchMatch(cat.category.toLowerCase(), searchFilter);
     const matchingItems = searchFilter
-      ? cat.buttons.filter(b => catMatch || b.label.toLowerCase().includes(searchFilter))
+      ? cat.buttons.filter(b => catMatch || searchMatch(b.label.toLowerCase(), searchFilter))
       : cat.buttons;
     if (searchFilter && matchingItems.length === 0) return;
     filtered.push({ idx: i, cat, count: searchFilter ? matchingItems.length : cat.buttons.length });
@@ -3195,11 +3211,11 @@ function getAllVisibleLoading() {
   if (searchFilter) {
     LOADING_CATALOG.forEach((cat, idx) => {
       if (hiddenLoadingCats.has(idx)) return;
-      const catMatch = cat.category.toLowerCase().includes(searchFilter);
+      const catMatch = searchMatch(cat.category.toLowerCase(), searchFilter);
       cat.buttons.forEach((b, bi) => {
         const lid = `${idx}:${bi}`;
         if (hiddenLoadingItems.has(lid)) return;
-        if (catMatch || b.label.toLowerCase().includes(searchFilter))
+        if (catMatch || searchMatch(b.label.toLowerCase(), searchFilter))
           result.push({ catIdx: idx, btnIdx: bi, btn: b, category: cat.category, dark: !!cat.dark, id: lid });
       });
     });
@@ -3337,8 +3353,8 @@ function navLoadingCat(dir) {
   LOADING_CATALOG.forEach((cat, i) => {
     if (hiddenLoadingCats.has(i)) return;
     if (searchFilter) {
-      const catMatch = cat.category.toLowerCase().includes(searchFilter);
-      const hasMatch = cat.buttons.some(b => catMatch || b.label.toLowerCase().includes(searchFilter));
+      const catMatch = searchMatch(cat.category.toLowerCase(), searchFilter);
+      const hasMatch = cat.buttons.some(b => catMatch || searchMatch(b.label.toLowerCase(), searchFilter));
       if (!hasMatch) return;
     }
     cats.push(i);
@@ -3387,10 +3403,10 @@ async function renderCanvas() {
       if (activeFilter === 'material' && s.tier !== 'Material') return false;
       if (activeFilter === 'liked' && !likedSets.has(s.id)) return false;
       // Check if set name/author matches OR if cached icons match
-      if (s.name.toLowerCase().includes(searchFilter) || s.author.toLowerCase().includes(searchFilter)) return true;
+      if (searchMatch(s.name.toLowerCase(), searchFilter) || searchMatch(s.author.toLowerCase(), searchFilter)) return true;
       const cached = iconCache[s.prefix];
-      if (cached) return cached.some(name => name.toLowerCase().includes(searchFilter));
-      return s.sample.some(name => name.toLowerCase().includes(searchFilter));
+      if (cached) return cached.some(name => searchMatch(name.toLowerCase(), searchFilter));
+      return s.sample.some(name => searchMatch(name.toLowerCase(), searchFilter));
     });
   } else if (activeSets.has('__all__')) {
     // "All" mode: show all non-hidden sets, load progressively
@@ -3824,7 +3840,7 @@ function findIconMatch(iconName, icons) {
 
 async function navSet(dir) {
   const visible = searchFilter
-    ? SETS.filter(s => s.name.toLowerCase().includes(searchFilter) || s.author.toLowerCase().includes(searchFilter) || s.tier.toLowerCase().includes(searchFilter))
+    ? SETS.filter(s => searchMatch(s.name.toLowerCase(), searchFilter) || searchMatch(s.author.toLowerCase(), searchFilter) || searchMatch(s.tier.toLowerCase(), searchFilter))
     : SETS;
   if (!visible.length) return;
   const currentId = activeSets.size === 1 ? [...activeSets][0] : null;
@@ -4043,8 +4059,8 @@ function navButtonCat(dir) {
     if (seen.has(cat.category)) return;
     seen.add(cat.category);
     if (searchFilter) {
-      const catMatch = cat.category.toLowerCase().includes(searchFilter);
-      const hasMatch = cat.buttons.some(b => catMatch || b.label.toLowerCase().includes(searchFilter));
+      const catMatch = searchMatch(cat.category.toLowerCase(), searchFilter);
+      const hasMatch = cat.buttons.some(b => catMatch || searchMatch(b.label.toLowerCase(), searchFilter));
       if (!hasMatch) return;
     }
     catNames.push(cat.category);
