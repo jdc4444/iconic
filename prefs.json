@@ -1,6 +1,6 @@
 {
   "scale": 58,
-  "view": "grid",
+  "view": "single",
   "sortMode": "category",
   "activeFilter": null,
   "appMode": "buttons",
@@ -8,8 +8,6 @@
   "liked": [],
   "hidden": [],
   "likedSets": [
-    "lucide",
-    "lucide-lab",
     "mdi",
     "heroicons"
   ],
@@ -35,8 +33,9 @@
   "hiddenLoadingCatsList": [
     11
   ],
-  "activeSet": "dashicons",
+  "activeSet": null,
   "activeButtonCat": null,
   "activeLoadingCat": null,
+  "animIdx": 0,
   "sidebarWidth": null
 }

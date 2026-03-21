@@ -438,8 +438,8 @@
     opacity: 0.6;
   }
   .side-arrow:hover { opacity: 1; background: var(--fg); color: var(--bg); }
-  .side-arrow.left { left: calc(var(--sidebar-w) + 6px); border-radius: 4px; }
-  .side-arrow.right { right: 6px; border-radius: 4px; }
+  .side-arrow.left { left: calc(var(--sidebar-w) + (100vw - var(--sidebar-w)) * 0.15); border-radius: 4px; }
+  .side-arrow.right { right: calc((100vw - var(--sidebar-w)) * 0.15); border-radius: 4px; }
 
   /* Grid item hover +/- */
   .grid-item-wrap { position: relative; cursor: pointer; }
@@ -737,9 +737,11 @@
         <button onclick="setScale(96)">96</button>
         <button onclick="setScale(256)">256</button>
       </div>
-      <div class="view-toggle" id="animToggle" style="margin-left:8px">
-        <button class="active" id="animNone" onclick="setAnim(null)" title="No animation">○</button>
-        <button id="animCycle" onclick="cycleAnim()" title="Cycle animations">▶</button>
+      <div class="view-toggle" id="animToggle" style="margin-left:8px;gap:0">
+        <button onclick="animPrev()" title="Previous animation" style="border-radius:3px 0 0 3px">‹</button>
+        <button class="active" id="animPause" onclick="animTogglePause()" title="Pause" style="border-radius:0;border-left:none;border-right:none">⏸</button>
+        <button onclick="animNext()" title="Next animation" style="border-radius:0 3px 3px 0">›</button>
+        <span id="animLabel" style="font-size:9px;color:var(--muted);min-width:40px;text-align:center;padding:0 4px;align-self:center"></span>
       </div>
       <div class="view-toggle" style="margin-left:auto">
         <button class="active" id="tbAll" onclick="toggleFilter(null)">All</button>
@@ -3747,33 +3749,61 @@ async function navSet(dir) {
 }
 
 // Animation cycle system
-function setAnim(animClass) {
-  clearInterval(animCycleTimer);
-  animCycleTimer = null;
-  currentAnim = animClass;
+let animPaused = true; // starts paused
+let animIdx = -1; // -1 = no animation
+
+function animSetByIndex(idx) {
+  animIdx = idx;
+  currentAnim = idx >= 0 ? ANIM_LIST[idx] : null;
   applyAnim();
-  document.getElementById('animNone').classList.toggle('active', !animClass);
-  document.getElementById('animCycle').classList.toggle('active', !!animClass);
-  document.getElementById('animCycle').title = animClass ? animClass.replace('anim-','') : 'Cycle animations';
+  updateAnimUI();
+  saveState();
 }
 
-function cycleAnim() {
-  const idx = currentAnim ? ANIM_LIST.indexOf(currentAnim) : -1;
-  const next = ANIM_LIST[(idx + 1) % ANIM_LIST.length];
-  setAnim(next);
-  // Auto-cycle every 3s
+function animNext() {
+  animSetByIndex((animIdx + 1) % ANIM_LIST.length);
+  if (!animPaused) restartAnimTimer();
+}
+
+function animPrev() {
+  animSetByIndex(animIdx <= 0 ? ANIM_LIST.length - 1 : animIdx - 1);
+  if (!animPaused) restartAnimTimer();
+}
+
+function animTogglePause() {
+  animPaused = !animPaused;
+  if (animPaused) {
+    clearInterval(animCycleTimer);
+    animCycleTimer = null;
+  } else {
+    if (animIdx < 0) animIdx = 0;
+    animSetByIndex(animIdx);
+    restartAnimTimer();
+  }
+  updateAnimUI();
+}
+
+function restartAnimTimer() {
   clearInterval(animCycleTimer);
   animCycleTimer = setInterval(() => {
-    const i = ANIM_LIST.indexOf(currentAnim);
-    const n = ANIM_LIST[(i + 1) % ANIM_LIST.length];
-    currentAnim = n;
+    animIdx = (animIdx + 1) % ANIM_LIST.length;
+    currentAnim = ANIM_LIST[animIdx];
     applyAnim();
-    document.getElementById('animCycle').title = n.replace('anim-','');
+    updateAnimUI();
   }, 3000);
 }
 
+function updateAnimUI() {
+  const label = document.getElementById('animLabel');
+  const pauseBtn = document.getElementById('animPause');
+  if (label) label.textContent = currentAnim ? currentAnim.replace('anim-','') : '';
+  if (pauseBtn) {
+    pauseBtn.textContent = animPaused ? '⏸' : '▶';
+    pauseBtn.classList.toggle('active', animPaused);
+  }
+}
+
 function applyAnim() {
-  // Remove all anim- classes, then add currentAnim if set
   const targets = document.querySelectorAll('.icon-cell, .demo-btn, .loading-item, .single-icon-display, .version-card');
   for (const el of targets) {
     for (const cls of ANIM_LIST) el.classList.remove(cls);
@@ -3949,6 +3979,7 @@ function buildState() {
     activeSet: activeSets.size === 1 ? [...activeSets][0] : null,
     activeButtonCat: activeButtonCats.size === 1 ? [...activeButtonCats][0] : null,
     activeLoadingCat: activeLoadingCats.size === 1 ? [...activeLoadingCats][0] : null,
+    animIdx,
     sidebarWidth: sidebar.style.width || null,
   };
 }
@@ -3990,6 +4021,7 @@ function applyState(s) {
   if (s.activeSet) { activeSets.clear(); activeSets.add(s.activeSet); }
   if (s.activeButtonCat != null) { activeButtonCats.clear(); activeButtonCats.add(s.activeButtonCat); }
   if (s.activeLoadingCat != null) { activeLoadingCats.clear(); activeLoadingCats.add(s.activeLoadingCat); }
+  if (s.animIdx != null && s.animIdx >= 0) { animIdx = s.animIdx; currentAnim = ANIM_LIST[animIdx]; animPaused = true; }
   if (s.sidebarWidth) sidebar.style.width = s.sidebarWidth;
 }
 
@@ -4008,7 +4040,7 @@ async function restoreState() {
   } catch {}
 }
 
-restoreState().then(() => loadCollections());
+restoreState().then(() => { updateAnimUI(); loadCollections(); });
 </script>
 </body>
 </html>
