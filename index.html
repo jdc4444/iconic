@@ -1394,7 +1394,8 @@ function renderButtonCanvas() {
       <div class="btn-cat-header">${g.category} <span style="font-weight:400;color:#aaa">${g.buttons.length}</span></div>
       <div class="btn-cat-grid${darkBg}">${g.buttons.map((b, i) => {
         const globalIdx = allBtns.indexOf(b);
-        return `<div style="cursor:pointer" onclick="openButtonSingle(${globalIdx})">${renderBtnHtml(b.btn)}</div>`;
+        const btnScale = currentScale / 48;
+        return `<div style="cursor:pointer" onclick="openButtonSingle(${globalIdx})">${renderBtnHtml(b.btn, btnScale)}</div>`;
       }).join('')}</div>
     </div>`;
   }).join('');
@@ -1422,11 +1423,12 @@ function renderButtonSingleView(canvas, allBtns) {
     const catBtns = allBtns.filter(b => b.catIdx === c.catIdx);
     canvas.innerHTML = `<div class="single-view">
       <div class="single-set-name">${c.category}</div>
-      <div class="versions-grid" style="max-width:900px">${catBtns.map((b, i) => {
+      <div class="versions-grid" style="max-width:${Math.max(900, (currentScale * 2 + 40) * 4)}px">${catBtns.map((b, i) => {
         const globalIdx = allBtns.indexOf(b);
         const isCurrent = globalIdx === buttonSingleIndex;
+        const btnScale = currentScale / 48;
         return `<div class="version-card${isCurrent ? ' current' : ''}" onclick="openButtonSingle(${globalIdx})" style="${isCurrent ? 'background:var(--hover)' : ''}">
-          ${renderBtnHtml(b.btn)}
+          ${renderBtnHtml(b.btn, btnScale)}
           <div class="version-label" title="${b.btn.label}">${b.btn.label}</div>
         </div>`;
       }).join('')}</div>

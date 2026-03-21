@@ -1,9 +1,9 @@
 {
-  "scale": 264,
-  "view": "versions",
+  "scale": 399,
+  "view": "single",
   "sortMode": "category",
   "activeFilter": null,
-  "appMode": "icons",
+  "appMode": "buttons",
   "dark": false,
   "liked": [],
   "hidden": [],
