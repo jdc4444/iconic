@@ -322,7 +322,7 @@
   .canvas::-webkit-scrollbar { height: 6px; }
   .canvas::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-  .set-section { margin-bottom: 32px; }
+  .set-section { margin-bottom: 8px; }
 
   .set-section-header {
     display: flex;
@@ -552,17 +552,18 @@
 
   .sidebar-filters {
     display: flex;
+    flex-wrap: wrap;
     gap: 4px;
-    padding: 6px 12px 0;
+    padding: 8px 12px;
   }
 
   .filter-btn {
-    padding: 4px 10px;
-    font-size: 10px;
+    padding: 6px 12px;
+    font-size: 11px;
     font-family: inherit;
     font-weight: 500;
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 4px;
     background: transparent;
     color: var(--muted);
     cursor: pointer;
@@ -614,6 +615,12 @@
     <div class="sidebar-filters">
       <button class="filter-btn" id="filterColor" onclick="toggleFilter('color')">Color</button>
       <button class="filter-btn" id="filterAnimated" onclick="toggleFilter('animated')">Animated</button>
+      <button class="filter-btn" id="filterStroke" onclick="toggleFilter('stroke')">Stroke</button>
+      <button class="filter-btn" id="filterEmoji" onclick="toggleFilter('emoji')">Emoji</button>
+      <button class="filter-btn" id="filterLogos" onclick="toggleFilter('logos')">Logos</button>
+      <button class="filter-btn" id="filterFlags" onclick="toggleFilter('flags')">Flags</button>
+      <button class="filter-btn" id="filterMaterial" onclick="toggleFilter('material')">Material</button>
+      <button class="filter-btn" id="filterLiked" onclick="toggleFilter('liked')">Liked</button>
     </div>
     <div class="keyboard-hint">
       <kbd>↑</kbd><kbd>↓</kbd> Sets <kbd>←</kbd><kbd>→</kbd> Icons <kbd>Space</kbd> Versions <kbd>F</kbd> Full <kbd>D</kbd> Dark <kbd>Esc</kbd> Exit
@@ -625,11 +632,11 @@
   <div class="main">
     <div class="topbar">
       <label>Scale</label>
-      <input type="range" class="scale-slider" id="scaleSlider" min="12" max="512" value="24">
-      <span class="scale-value" id="scaleValue">24px</span>
+      <input type="range" class="scale-slider" id="scaleSlider" min="12" max="512" value="100">
+      <span class="scale-value" id="scaleValue">100px</span>
       <div class="scale-presets">
         <button onclick="setScale(16)">16</button>
-        <button onclick="setScale(24)" class="active">24</button>
+        <button onclick="setScale(24)">24</button>
         <button onclick="setScale(48)">48</button>
         <button onclick="setScale(96)">96</button>
         <button onclick="setScale(128)">128</button>
@@ -653,8 +660,8 @@
 <div class="fs-toolbar" id="fsToolbar">
   <select id="fsSetSelect" onchange="fsSelectSet(this.value)"></select>
   <label style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Scale</label>
-  <input type="range" class="scale-slider" id="fsScaleSlider" min="12" max="512" value="24">
-  <span class="scale-value" id="fsScaleValue">24px</span>
+  <input type="range" class="scale-slider" id="fsScaleSlider" min="12" max="512" value="100">
+  <span class="scale-value" id="fsScaleValue">100px</span>
   <div class="scale-presets">
     <button onclick="setScale(24)">24</button>
     <button onclick="setScale(48)">48</button>
@@ -670,7 +677,7 @@
 let SETS = [];
 let TIER_ORDER = [];
 let activeSets = new Set();
-let currentScale = 24;
+let currentScale = 100;
 let currentView = 'grid';
 let singleIndex = 0;
 let allVisibleIcons = [];
@@ -707,6 +714,8 @@ async function loadCollections() {
         sample: info.samples || [],
         palette: !!info.palette,
         animated: !!(info.tags && info.tags.includes('Contains Animations')),
+        stroke: !!(info.tags && info.tags.includes('Uses Stroke')),
+        tags: info.tags || [],
       });
     }
     // Sort by category then name
@@ -762,7 +771,13 @@ function renderSidebar() {
 
   // Apply type filter
   if (activeFilter === 'color') filtered = filtered.filter(s => s.palette);
-  if (activeFilter === 'animated') filtered = filtered.filter(s => s.animated);
+  else if (activeFilter === 'animated') filtered = filtered.filter(s => s.animated);
+  else if (activeFilter === 'stroke') filtered = filtered.filter(s => s.stroke);
+  else if (activeFilter === 'emoji') filtered = filtered.filter(s => s.tier === 'Emoji');
+  else if (activeFilter === 'logos') filtered = filtered.filter(s => s.tier === 'Logos');
+  else if (activeFilter === 'flags') filtered = filtered.filter(s => s.tier === 'Flags / Maps');
+  else if (activeFilter === 'material') filtered = filtered.filter(s => s.tier === 'Material');
+  else if (activeFilter === 'liked') filtered = filtered.filter(s => likedSets.has(s.id));
   // Hide sets removed with -
   filtered = filtered.filter(s => !hiddenSets.has(s.id));
 
@@ -799,8 +814,11 @@ function filterSets(q) {
 
 function toggleFilter(type) {
   activeFilter = activeFilter === type ? null : type;
-  document.getElementById('filterColor').classList.toggle('active', activeFilter === 'color');
-  document.getElementById('filterAnimated').classList.toggle('active', activeFilter === 'animated');
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  if (activeFilter) {
+    const btn = document.getElementById('filter' + activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1));
+    if (btn) btn.classList.add('active');
+  }
   renderSidebar();
   saveState();
 }
