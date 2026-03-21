@@ -7,7 +7,15 @@
   "dark": false,
   "liked": [
     "openmoji:person-walking-dark-skin-tone-facing-right",
-    "openmoji:man-walking-medium-dark-skin-tone-facing-right"
+    "openmoji:man-walking-medium-dark-skin-tone-facing-right",
+    "ls:walking",
+    "zmdi:walk",
+    "grommet-icons:bike",
+    "cil:bike",
+    "streamline-plump:bicycle-bike",
+    "glyphs:bike",
+    "zmdi:bike",
+    "ps:bike"
   ],
   "hidden": [],
   "likedSets": [
@@ -36,7 +44,7 @@
   "hiddenLoadingCatsList": [
     11
   ],
-  "activeSet": "openmoji",
+  "activeSet": null,
   "activeButtonCat": null,
   "activeLoadingCat": null,
   "animIdx": 1,
