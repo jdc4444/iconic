@@ -752,6 +752,9 @@
       </div>
       <div style="margin-left:auto"></div>
       <div class="view-toggle">
+        <button id="tbLiked" onclick="toggleLikedFilter()">Liked</button>
+      </div>
+      <div class="view-toggle">
         <button class="active" onclick="setView('grid')" id="btnGrid">Grid</button>
         <button onclick="setView('single')" id="btnSingle">Single</button>
         <button onclick="setView('versions')" id="btnVersions">Versions</button>
@@ -1008,11 +1011,11 @@ function renderControls(mode) {
     // All toggle — independent, selected by default
     const allActive = showAll ? ' active' : '';
     fhtml += `<button class="sort-btn${allActive}" onclick="toggleShowAll()">All</button>`;
-    // Liked toggle — independent
-    const likedActive = activeFilter === 'liked' ? ' active' : '';
-    fhtml += `<button class="sort-btn${likedActive}" onclick="toggleLikedFilter()">Liked</button>`;
     sf.innerHTML = fhtml;
   }
+  // Sync topbar Liked button
+  const tbLiked = document.getElementById('tbLiked');
+  if (tbLiked) tbLiked.classList.toggle('active', activeFilter === 'liked');
 }
 
 function getIndicesForCatName(name) {
