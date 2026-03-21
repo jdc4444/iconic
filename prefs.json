@@ -1,6 +1,6 @@
 {
   "scale": 221,
-  "view": "grid",
+  "view": "single",
   "sortMode": "category",
   "activeFilter": null,
   "appMode": "buttons",
@@ -14,7 +14,11 @@
     "heroicons"
   ],
   "hiddenSets": [],
+  "likedButtons": [],
+  "hiddenButtons": [],
+  "likedButtonCats": [],
+  "hiddenButtonCats": [],
   "activeSet": "dashicons",
-  "activeButtonCat": 6,
+  "activeButtonCat": 177,
   "sidebarWidth": null
 }

@@ -642,15 +642,7 @@
     <div class="sidebar-search">
       <input type="text" id="searchInput" placeholder="Search sets..." oninput="filterSets(this.value)">
     </div>
-    <div class="sidebar-filters">
-      <button class="filter-btn" id="filterColor" onclick="toggleFilter('color')">Color</button>
-      <button class="filter-btn" id="filterAnimated" onclick="toggleFilter('animated')">Animated</button>
-      <button class="filter-btn" id="filterStroke" onclick="toggleFilter('stroke')">Stroke</button>
-      <button class="filter-btn" id="filterEmoji" onclick="toggleFilter('emoji')">Emoji</button>
-
-<button class="filter-btn" id="filterMaterial" onclick="toggleFilter('material')">Material</button>
-      <button class="filter-btn" id="filterLiked" onclick="toggleFilter('liked')">Liked</button>
-    </div>
+    <div class="sidebar-filters" id="sidebarFilters"></div>
     <div class="keyboard-hint">
       <kbd>↑</kbd><kbd>↓</kbd> Sets <kbd>←</kbd><kbd>→</kbd> Icons <kbd>Space</kbd> Versions <kbd>F</kbd> Full <kbd>D</kbd> Dark <kbd>Esc</kbd> Exit
     </div>
@@ -720,6 +712,10 @@ let buttonSingleIndex = 0; // current button index in single view
 const likedIcons = new Set(); // stores liked icon identifiers (prefix:name)
 const likedSets = new Set(['lucide', 'lucide-lab']); // liked icon set prefixes
 const hiddenSets = new Set(); // hidden icon set prefixes
+const likedButtons = new Set(); // stores liked button identifiers (catIdx:btnIdx)
+const likedButtonCats = new Set(); // liked button category indices
+const hiddenButtonCats = new Set(); // hidden button category indices
+const hiddenButtonItems = new Set(); // hidden individual buttons (catIdx:btnIdx)
 const iconCache = {}; // prefix -> [icon names]
 
 async function loadCollections() {
@@ -798,6 +794,7 @@ function renderSidebar() {
   document.getElementById('searchInput').placeholder = 'Search sets...';
   document.querySelector('.sidebar-filters').style.display = '';
   document.querySelector('.sidebar-sort').style.display = '';
+  renderFilterButtons('icons');
 
   let filtered = searchFilter
     ? SETS.filter(s => {
@@ -850,27 +847,65 @@ function renderSidebar() {
 
 function renderButtonSidebar(el) {
   let html = '';
-  const visibleCats = [];
+  let filtered = [];
   BUTTON_CATALOG.forEach((cat, i) => {
+    if (hiddenButtonCats.has(i)) return;
     const catMatch = cat.category.toLowerCase().includes(searchFilter);
     const matchingBtns = searchFilter
       ? cat.buttons.filter(b => catMatch || b.label.toLowerCase().includes(searchFilter))
       : cat.buttons;
     if (searchFilter && matchingBtns.length === 0) return;
-    visibleCats.push(i);
-    const active = activeButtonCats.has(i) ? ' active' : '';
-    const count = searchFilter ? matchingBtns.length : cat.buttons.length;
-    html += `<div class="set-item${active}" onclick="loadButtonCat(${i})">
-      <div class="dot"></div>
-      <div class="set-info"><div class="set-name">${cat.category}</div></div>
-      <div class="set-count">${count}</div>
-    </div>`;
+    filtered.push({ idx: i, cat, count: searchFilter ? matchingBtns.length : cat.buttons.length });
   });
+
+  // Apply button-mode filters
+  if (activeFilter === 'liked') filtered = filtered.filter(f => likedButtonCats.has(f.idx));
+  if (activeFilter === 'dark') filtered = filtered.filter(f => f.cat.dark);
+
+  // Sort
+  if (sortMode === 'name') {
+    filtered.sort((a, b) => a.cat.category.localeCompare(b.cat.category));
+  }
+
+  for (const f of filtered) {
+    const active = activeButtonCats.has(f.idx) ? ' active' : '';
+    const liked = likedButtonCats.has(f.idx) ? ' set-liked' : '';
+    html += `<div class="set-item${active}" onclick="loadButtonCat(${f.idx})">
+      <div class="dot"></div>
+      <div class="set-info"><div class="set-name">${f.cat.category}</div></div>
+      <div class="set-count">${f.count}</div>
+      <div class="set-rate">
+        <button class="${liked ? 'set-liked' : ''}" onclick="event.stopPropagation();rateButtonCat(${f.idx},'minus')" title="Hide category">&minus;</button>
+        <button class="${liked}" onclick="event.stopPropagation();rateButtonCat(${f.idx},'plus')" title="${liked ? 'Unlike' : 'Like'}">&plus;</button>
+      </div>
+    </div>`;
+  }
   el.innerHTML = html;
-  // Update search placeholder and hide icon-specific filters
+  // Update search placeholder and show shared controls
   document.getElementById('searchInput').placeholder = 'Search buttons...';
-  document.querySelector('.sidebar-filters').style.display = 'none';
-  document.querySelector('.sidebar-sort').style.display = 'none';
+  document.querySelector('.sidebar-filters').style.display = '';
+  document.querySelector('.sidebar-sort').style.display = '';
+  renderFilterButtons('buttons');
+}
+
+function renderFilterButtons(mode) {
+  const el = document.getElementById('sidebarFilters');
+  const filters = mode === 'icons'
+    ? [
+        { id: 'color', label: 'Color' },
+        { id: 'animated', label: 'Animated' },
+        { id: 'stroke', label: 'Stroke' },
+        { id: 'emoji', label: 'Emoji' },
+        { id: 'material', label: 'Material' },
+        { id: 'liked', label: 'Liked' },
+      ]
+    : [
+        { id: 'dark', label: 'Dark BG' },
+        { id: 'liked', label: 'Liked' },
+      ];
+  el.innerHTML = filters.map(f =>
+    `<button class="filter-btn${activeFilter === f.id ? ' active' : ''}" onclick="toggleFilter('${f.id}')">${f.label}</button>`
+  ).join('');
 }
 
 function loadButtonCat(idx) {
@@ -890,11 +925,6 @@ function filterSets(q) {
 
 function toggleFilter(type) {
   activeFilter = activeFilter === type ? null : type;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  if (activeFilter) {
-    const btn = document.getElementById('filter' + activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1));
-    if (btn) btn.classList.add('active');
-  }
   renderSidebar();
   saveState();
 }
@@ -2850,10 +2880,13 @@ function getAllVisibleButtons() {
   // When searching, show from ALL matching categories; otherwise only active
   if (searchFilter) {
     BUTTON_CATALOG.forEach((cat, idx) => {
+      if (hiddenButtonCats.has(idx)) return;
       const catMatch = cat.category.toLowerCase().includes(searchFilter);
       cat.buttons.forEach((b, bi) => {
+        const btnId = `${idx}:${bi}`;
+        if (hiddenButtonItems.has(btnId)) return;
         if (catMatch || b.label.toLowerCase().includes(searchFilter)) {
-          result.push({ catIdx: idx, btnIdx: bi, btn: b, category: cat.category, dark: !!cat.dark });
+          result.push({ catIdx: idx, btnIdx: bi, btn: b, category: cat.category, dark: !!cat.dark, id: btnId });
         }
       });
     });
@@ -2861,7 +2894,9 @@ function getAllVisibleButtons() {
     const cats = getActiveButtonCats();
     for (const { idx, cat } of cats) {
       cat.buttons.forEach((b, bi) => {
-        result.push({ catIdx: idx, btnIdx: bi, btn: b, category: cat.category, dark: !!cat.dark });
+        const btnId = `${idx}:${bi}`;
+        if (hiddenButtonItems.has(btnId)) return;
+        result.push({ catIdx: idx, btnIdx: bi, btn: b, category: cat.category, dark: !!cat.dark, id: btnId });
       });
     }
   }
@@ -2937,6 +2972,10 @@ function renderButtonSingleView(canvas, allBtns) {
   if (buttonSingleIndex < 0) buttonSingleIndex = allBtns.length - 1;
 
   const c = allBtns[buttonSingleIndex];
+  const btnId = c.id || `${c.catIdx}:${c.btnIdx}`;
+  const isLiked = likedButtons.has(btnId);
+  const rateHtml = `<button class="rate-btn minus" onclick="rateButton('${btnId}','minus')" title="${isLiked ? 'Remove from likes' : 'Hide'}">&minus;</button>
+    <button class="rate-btn plus${isLiked ? ' liked' : ''}" onclick="rateButton('${btnId}','plus')" title="${isLiked ? 'Unlike' : 'Like'}">&plus;</button>`;
 
   if (currentView === 'versions') {
     // Show all buttons in this category as a grid
@@ -2954,6 +2993,7 @@ function renderButtonSingleView(canvas, allBtns) {
       }).join('')}</div>
       <div class="single-icon-name">${catBtns.length} style${catBtns.length !== 1 ? 's' : ''} in category</div>
       <div class="single-nav">
+        ${rateHtml}
         <button onclick="navButtonSingle(-1)">&larr; Prev</button>
         <span class="single-icon-name">${buttonSingleIndex + 1} / ${allBtns.length}</span>
         <button onclick="navButtonSingle(1)">Next &rarr;</button>
@@ -2973,6 +3013,7 @@ function renderButtonSingleView(canvas, allBtns) {
     <div class="single-icon-name" style="font-size:12px;margin-top:12px">${c.btn.label}</div>
     <div style="font-size:10px;color:var(--muted);max-width:500px;word-break:break-all;text-align:center;margin-top:4px;flex-shrink:0">${c.btn.style}</div>
     <div class="single-nav" style="margin-top:16px;flex-shrink:0">
+      ${rateHtml}
       <button onclick="navButtonSingle(-1)">&larr; Prev</button>
       <span class="single-icon-name">${buttonSingleIndex + 1} / ${allBtns.length}</span>
       <button onclick="navButtonSingle(1)">Next &rarr;</button>
@@ -3297,6 +3338,32 @@ function rateIcon(iconId, action) {
   saveState();
 }
 
+function rateButtonCat(idx, action) {
+  if (action === 'plus') {
+    hiddenButtonCats.delete(idx);
+    if (likedButtonCats.has(idx)) likedButtonCats.delete(idx);
+    else likedButtonCats.add(idx);
+  } else {
+    if (likedButtonCats.has(idx)) likedButtonCats.delete(idx);
+    else hiddenButtonCats.add(idx);
+  }
+  renderSidebar();
+  saveState();
+}
+
+function rateButton(btnId, action) {
+  if (action === 'plus') {
+    hiddenButtonItems.delete(btnId);
+    if (likedButtons.has(btnId)) likedButtons.delete(btnId);
+    else likedButtons.add(btnId);
+  } else {
+    if (likedButtons.has(btnId)) likedButtons.delete(btnId);
+    else { hiddenButtonItems.add(btnId); saveState(); navButtonSingle(1); return; }
+  }
+  renderCanvas();
+  saveState();
+}
+
 function selectVariant(fullIcon) {
   // Find which base icon this variant belongs to and update singleIndex
   const baseName = iconBaseName(fullIcon.split(':')[1]);
@@ -3497,6 +3564,10 @@ function buildState() {
     hidden: [...hiddenIcons],
     likedSets: [...likedSets],
     hiddenSets: [...hiddenSets],
+    likedButtons: [...likedButtons],
+    hiddenButtons: [...hiddenButtonItems],
+    likedButtonCats: [...likedButtonCats],
+    hiddenButtonCats: [...hiddenButtonCats],
     activeSet: activeSets.size === 1 ? [...activeSets][0] : null,
     activeButtonCat: activeButtonCats.size === 1 ? [...activeButtonCats][0] : null,
     sidebarWidth: sidebar.style.width || null,
@@ -3529,6 +3600,10 @@ function applyState(s) {
   if (s.hidden) s.hidden.forEach(id => hiddenIcons.add(id));
   if (s.likedSets) { likedSets.clear(); s.likedSets.forEach(id => likedSets.add(id)); }
   if (s.hiddenSets) s.hiddenSets.forEach(id => hiddenSets.add(id));
+  if (s.likedButtons) s.likedButtons.forEach(id => likedButtons.add(id));
+  if (s.hiddenButtons) s.hiddenButtons.forEach(id => hiddenButtonItems.add(id));
+  if (s.likedButtonCats) s.likedButtonCats.forEach(id => likedButtonCats.add(id));
+  if (s.hiddenButtonCats) s.hiddenButtonCats.forEach(id => hiddenButtonCats.add(id));
   if (s.activeSet) { activeSets.clear(); activeSets.add(s.activeSet); }
   if (s.activeButtonCat != null) { activeButtonCats.clear(); activeButtonCats.add(s.activeButtonCat); }
   if (s.sidebarWidth) sidebar.style.width = s.sidebarWidth;
