@@ -354,16 +354,14 @@
     justify-content: center;
     aspect-ratio: 1;
     border-radius: 3px;
-    transition: background 0.1s, opacity 0.18s, transform 0.18s;
+    transition: background 0.1s, opacity 0.18s;
     cursor: pointer;
     position: relative;
     opacity: 0;
-    transform: scale(0.8);
   }
 
   .icon-cell.visible {
     opacity: 1;
-    transform: scale(1);
   }
 
   .icon-cell:hover { background: var(--hover); }
@@ -680,7 +678,7 @@
 
   /* Standard animation library — applicable to any element */
   @keyframes anim-pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.06); } }
-  @keyframes anim-spin { to { transform:rotate(360deg); } }
+  @keyframes anim-spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
   @keyframes anim-bounce { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-4px); } }
   @keyframes anim-shimmer { 0% { filter:brightness(1); } 50% { filter:brightness(1.3); } 100% { filter:brightness(1); } }
   @keyframes anim-glow { 0%,100% { filter:drop-shadow(0 0 2px currentColor); } 50% { filter:drop-shadow(0 0 8px currentColor); } }
@@ -692,18 +690,21 @@
   @keyframes anim-pop { 0%,100% { transform:scale(1); } 50% { transform:scale(1.15); } }
   @keyframes anim-slide { 0% { transform:translateX(-6px);opacity:0; } 100% { transform:translateX(0);opacity:1; } }
 
-  .anim-pulse { animation:anim-pulse 2s ease-in-out infinite; }
-  .anim-spin { animation:anim-spin 2s linear infinite; }
-  .anim-bounce { animation:anim-bounce 1s ease-in-out infinite; }
-  .anim-shimmer { animation:anim-shimmer 2s ease-in-out infinite; }
-  .anim-glow { animation:anim-glow 2s ease-in-out infinite; }
-  .anim-fade { animation:anim-fade 2s ease-in-out infinite; }
-  .anim-shake { animation:anim-shake 0.5s ease-in-out infinite; }
-  .anim-float { animation:anim-float 3s ease-in-out infinite; }
-  .anim-flip { animation:anim-flip 2s ease-in-out infinite; }
-  .anim-wiggle { animation:anim-wiggle 1s ease-in-out infinite; }
-  .anim-pop { animation:anim-pop 1s ease-in-out infinite; }
-  .anim-slide { animation:anim-slide 0.6s ease-out infinite alternate; }
+  /* Animations target iconify-icon/button children, or standalone elements */
+  [class*="anim-"] > iconify-icon, [class*="anim-"] > button,
+  [class*="anim-"]:is(.single-icon-display,.demo-btn,.loading-item,.version-card) { animation: var(--anim); }
+  .anim-pulse { --anim:anim-pulse 2s ease-in-out infinite; }
+  .anim-spin { --anim:anim-spin 2s linear infinite; }
+  .anim-bounce { --anim:anim-bounce 1s ease-in-out infinite; }
+  .anim-shimmer { --anim:anim-shimmer 2s ease-in-out infinite; }
+  .anim-glow { --anim:anim-glow 2s ease-in-out infinite; }
+  .anim-fade { --anim:anim-fade 2s ease-in-out infinite; }
+  .anim-shake { --anim:anim-shake 0.5s ease-in-out infinite; }
+  .anim-float { --anim:anim-float 3s ease-in-out infinite; }
+  .anim-flip { --anim:anim-flip 2s ease-in-out infinite; }
+  .anim-wiggle { --anim:anim-wiggle 1s ease-in-out infinite; }
+  .anim-pop { --anim:anim-pop 1s ease-in-out infinite; }
+  .anim-slide { --anim:anim-slide 0.6s ease-out infinite alternate; }
 </style>
 </head>
 <body>
@@ -3765,21 +3766,15 @@ function animSetByIndex(idx) {
 }
 
 function animNext() {
-  // Right arrow: if paused, start playing. If playing, skip forward.
-  if (animPaused) {
-    animPaused = false;
-    if (animIdx < 0) animIdx = 0;
-    animSetByIndex(animIdx);
-    restartAnimTimer();
-  } else {
-    animSetByIndex(nextVisibleAnim(animIdx));
-    restartAnimTimer();
-  }
-  updateAnimUI();
+  // Skip to next animation, let it loop on its own
+  if (animIdx < 0) animIdx = -1;
+  animSetByIndex(nextVisibleAnim(animIdx));
+  if (!animPaused) restartAnimTimer();
 }
 
 function animPrev() {
-  // Left arrow: navigate back, don't change play/pause state
+  // Skip to previous animation, let it loop on its own
+  if (animIdx < 0) animIdx = 0;
   animSetByIndex(prevVisibleAnim(animIdx));
   if (!animPaused) restartAnimTimer();
 }
@@ -3830,11 +3825,9 @@ function updateAnimUI() {
   const pauseBtn = document.getElementById('animPause');
   if (label) label.textContent = currentAnim ? currentAnim.replace('anim-','') : '';
   if (pauseBtn) {
-    pauseBtn.textContent = '⏸';
+    pauseBtn.textContent = animPaused ? '⏸' : '▶';
     pauseBtn.classList.toggle('active', animPaused);
   }
-  const rightBtn = document.getElementById('animRight');
-  if (rightBtn) rightBtn.classList.toggle('active', !animPaused);
   // +/- buttons
   const likeBtn = document.getElementById('animLike');
   const hideBtn = document.getElementById('animHide');
