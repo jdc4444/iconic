@@ -812,12 +812,8 @@ function setMode(mode) {
   document.getElementById('modeIcons').classList.toggle('active', mode === 'icons');
   document.getElementById('modeButtons').classList.toggle('active', mode === 'buttons');
   document.getElementById('modeLoading').classList.toggle('active', mode === 'loading');
-  if (mode === 'buttons' && activeButtonCats.size === 0 && BUTTON_CATALOG.length) {
-    activeButtonCats.add(0);
-  }
-  if (mode === 'loading' && activeLoadingCats.size === 0 && LOADING_CATALOG.length) {
-    activeLoadingCats.add(0);
-  }
+  // Buttons and Loading default to showing all (empty set = all)
+  // Clicking a category narrows to just that one
   renderSidebar();
   renderCanvas();
   saveState();
@@ -964,8 +960,12 @@ function renderFilterButtons(mode) {
 }
 
 function loadButtonCat(idx) {
-  activeButtonCats.clear();
-  activeButtonCats.add(idx);
+  if (activeButtonCats.size === 1 && activeButtonCats.has(idx)) {
+    activeButtonCats.clear(); // toggle back to All
+  } else {
+    activeButtonCats.clear();
+    activeButtonCats.add(idx);
+  }
   buttonSingleIndex = 0;
   renderSidebar();
   renderCanvas();
@@ -3308,8 +3308,12 @@ function renderLoadingSidebar(el) {
 }
 
 function loadLoadingCat(idx) {
-  activeLoadingCats.clear();
-  activeLoadingCats.add(idx);
+  if (activeLoadingCats.size === 1 && activeLoadingCats.has(idx)) {
+    activeLoadingCats.clear(); // toggle back to All
+  } else {
+    activeLoadingCats.clear();
+    activeLoadingCats.add(idx);
+  }
   loadingSingleIndex = 0;
   renderSidebar();
   renderCanvas();
