@@ -74,11 +74,28 @@
   }
 
   .sidebar-header {
-    padding: 14px 16px 10px;
+    display: flex;
     border-bottom: 1px solid var(--border);
   }
 
-  .sidebar-header h1 { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 4px; }
+  .sidebar-header .mode-tab {
+    flex: 1;
+    padding: 14px 16px 10px;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: inherit;
+    letter-spacing: -0.01em;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--muted);
+    transition: color 0.15s;
+    text-align: center;
+  }
+
+  .sidebar-header .mode-tab.active { color: var(--fg); }
+  .sidebar-header .mode-tab:hover:not(.active) { color: var(--fg); opacity: 0.6; }
+
   .sidebar-header p { font-size: 11px; color: var(--muted); line-height: 1.4; }
 
   .sidebar-sort {
@@ -547,8 +564,8 @@
 <div class="app">
   <div class="sidebar">
     <div class="sidebar-header">
-      <h1>Icon Sampler</h1>
-      <p>Loading icon sets...</p>
+      <button class="mode-tab active" id="modeIcons" onclick="setMode('icons')">Icons</button>
+      <button class="mode-tab" id="modeButtons" onclick="setMode('buttons')">Buttons</button>
     </div>
     <div class="sidebar-sort">
       <button class="sort-btn active" id="btnSortCategory" onclick="setSortMode('category')">By Category</button>
@@ -625,6 +642,7 @@ let searchFilter = '';
 let sortMode = 'category'; // 'category' or 'name'
 let selectedVariant = null; // specific variant in single view
 let activeFilter = null; // null, 'color', or 'animated'
+let appMode = 'icons'; // 'icons' or 'buttons'
 const iconCache = {}; // prefix -> [icon names]
 
 async function loadCollections() {
@@ -660,8 +678,6 @@ async function loadCollections() {
       return a.name.localeCompare(b.name);
     });
     SETS = sets;
-    // Update header
-    document.querySelector('.sidebar-header p').textContent = `${SETS.length} icon sets via Iconify`;
     document.querySelector('title').textContent = `Icon Sampler — ${SETS.length} Sets`;
     // Default to first set
     if (SETS.length) activeSets.add(SETS[0].id);
@@ -672,6 +688,15 @@ async function loadCollections() {
   } catch (e) {
     canvas.innerHTML = '<div class="empty-state">Failed to load collections. Check network.</div>';
   }
+}
+
+function setMode(mode) {
+  appMode = mode;
+  document.getElementById('modeIcons').classList.toggle('active', mode === 'icons');
+  document.getElementById('modeButtons').classList.toggle('active', mode === 'buttons');
+  // TODO: switch sidebar content between icons and buttons
+  renderSidebar();
+  renderCanvas();
 }
 
 function setSortMode(mode) {
