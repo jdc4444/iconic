@@ -927,7 +927,12 @@ function filterSets(q) {
 
 function toggleFilter(type) {
   activeFilter = activeFilter === type ? null : type;
+  // "All" (null) clears filter; for buttons also clears category selection to show all
+  if (activeFilter === null && appMode === 'buttons') {
+    activeButtonCats.clear();
+  }
   renderSidebar();
+  renderCanvas();
   saveState();
 }
 
@@ -2890,6 +2895,16 @@ function getAllVisibleButtons() {
         if (catMatch || b.label.toLowerCase().includes(searchFilter)) {
           result.push({ catIdx: idx, btnIdx: bi, btn: b, category: cat.category, dark: !!cat.dark, id: btnId });
         }
+      });
+    });
+  } else if (activeButtonCats.size === 0) {
+    // "All" mode — show all non-hidden categories
+    BUTTON_CATALOG.forEach((cat, idx) => {
+      if (hiddenButtonCats.has(idx)) return;
+      cat.buttons.forEach((b, bi) => {
+        const btnId = `${idx}:${bi}`;
+        if (hiddenButtonItems.has(btnId)) return;
+        result.push({ catIdx: idx, btnIdx: bi, btn: b, category: cat.category, dark: !!cat.dark, id: btnId });
       });
     });
   } else {
