@@ -445,6 +445,22 @@
   .single-icon-name { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .single-set-name { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 
+  .rate-btn {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: 1px solid var(--border);
+    border-radius: 50%; cursor: pointer;
+    color: var(--muted);
+    font-size: 18px; line-height: 1;
+    font-family: inherit; font-weight: 400;
+    transition: all 0.15s;
+  }
+  .rate-btn:hover { border-color: var(--fg); color: var(--fg); }
+  .rate-btn.plus { color: var(--fg); }
+  .rate-btn.plus:hover { background: var(--fg); color: var(--bg); }
+  .rate-btn.minus:hover { background: #e74c3c; border-color: #e74c3c; color: #fff; }
+  .rate-btn.liked { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+
   /* Fullscreen */
   body.fullscreen .sidebar { display: none; }
   body.fullscreen .topbar { display: none; }
@@ -643,6 +659,7 @@ let sortMode = 'category'; // 'category' or 'name'
 let selectedVariant = null; // specific variant in single view
 let activeFilter = null; // null, 'color', or 'animated'
 let appMode = 'icons'; // 'icons' or 'buttons'
+const likedIcons = new Set(); // stores liked icon identifiers (prefix:name)
 const iconCache = {}; // prefix -> [icon names]
 
 async function loadCollections() {
@@ -941,7 +958,10 @@ function renderSingleView(canvas, active) {
   allVisibleIcons = [];
   active.forEach(s => {
     const names = getIcons(s);
-    names.forEach(n => allVisibleIcons.push({ icon: `${s.prefix}:${n}`, set: s.name, prefix: s.prefix }));
+    names.forEach(n => {
+      const fullIcon = `${s.prefix}:${n}`;
+      if (!hiddenIcons.has(fullIcon)) allVisibleIcons.push({ icon: fullIcon, set: s.name, prefix: s.prefix });
+    });
   });
   if (!allVisibleIcons.length) return;
 
@@ -958,6 +978,9 @@ function renderSingleView(canvas, active) {
     ? (allVisibleIcons.find(ic => ic.icon === selectedVariant) || baseIcon)
     : baseIcon;
   const sz = Math.max(currentScale, 500);
+  const isLiked = likedIcons.has(c.icon);
+  const rateHtml = `<button class="rate-btn minus" onclick="rateIcon('${c.icon}','minus')" title="${isLiked ? 'Remove from likes' : 'Hide from view'}">&minus;</button>
+    <button class="rate-btn plus${isLiked ? ' liked' : ''}" onclick="rateIcon('${c.icon}','plus')" title="${isLiked ? 'Unlike' : 'Like'}">&plus;</button>`;
 
   if (currentView === 'versions') {
     // Full versions view — all variants displayed larger
@@ -974,6 +997,7 @@ function renderSingleView(canvas, active) {
       }).join('')}</div>
       <div class="single-icon-name">${variants.length} variant${variants.length !== 1 ? 's' : ''}</div>
       <div class="single-nav">
+        ${rateHtml}
         <button onclick="navSingle(-1)">&larr; Prev</button>
         <span class="single-icon-name">${singleIndex + 1} / ${uniqueIcons.length}</span>
         <button onclick="navSingle(1)">Next &rarr;</button>
@@ -998,6 +1022,7 @@ function renderSingleView(canvas, active) {
     <div class="single-icon-name">${c.icon}</div>
     ${variantHtml}
     <div class="single-nav">
+      ${rateHtml}
       <button onclick="navSingle(-1)">&larr; Prev</button>
       <span class="single-icon-name">${singleIndex + 1} / ${uniqueIcons.length}</span>
       <button onclick="navSingle(1)">Next &rarr;</button>
@@ -1038,6 +1063,21 @@ function openSingle(idx) {
   }
   currentView = 'single';
   setView('single');
+}
+
+const hiddenIcons = new Set(); // icons removed with -
+
+function rateIcon(iconId, action) {
+  if (action === 'plus') {
+    hiddenIcons.delete(iconId);
+    if (likedIcons.has(iconId)) likedIcons.delete(iconId);
+    else likedIcons.add(iconId);
+  } else {
+    // minus: if liked, remove from likes; otherwise hide from view
+    if (likedIcons.has(iconId)) likedIcons.delete(iconId);
+    else { hiddenIcons.add(iconId); navSingle(1); return; }
+  }
+  renderCanvas();
 }
 
 function selectVariant(fullIcon) {
