@@ -1908,7 +1908,14 @@ function renderLoadingHtml(item, size) {
   const maxDim = Math.max(intrinsicW, intrinsicH, 1);
   const cellPx = Math.round(28 * s);
   const scale = (cellPx / maxDim).toFixed(3);
-  // Use transform:scale inside a fixed-size clipping container
+  // Class-based loaders (Whirl etc) use ::before/::after — scale + clip
+  if (item.cls) {
+    const whirlScale = (cellPx / 50).toFixed(3); // Whirl CSS uses 50px base internally
+    return `<div style="width:${cellPx}px;height:${cellPx}px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
+      <div class="loading-item${cls}" style="width:50px;height:50px;transform:scale(${whirlScale});transform-origin:center;flex-shrink:0">${inner}</div>
+    </div>`;
+  }
+  // Inline-style loaders — clip overflow from box-shadows etc
   return `<div style="width:${cellPx}px;height:${cellPx}px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
     <div class="loading-item${cls}" style="${item.style};transform:scale(${scale});transform-origin:center">${inner}</div>
   </div>`;
