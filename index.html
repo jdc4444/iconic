@@ -808,7 +808,12 @@ let appMode = 'icons'; // 'icons' or 'buttons'
 let activeButtonCats = new Set(); // active button category indices
 let buttonSingleIndex = 0; // current button index in single view
 const likedIcons = new Set(); // stores liked icon identifiers (prefix:name)
+const likedIconPrefixes = new Set(); // prefixes that have liked individual icons
 const likedSets = new Set(['lucide', 'lucide-lab']); // liked icon set prefixes
+function updateLikedPrefixes() {
+  likedIconPrefixes.clear();
+  for (const ic of likedIcons) likedIconPrefixes.add(ic.split(':')[0]);
+}
 const hiddenSets = new Set(); // hidden icon set prefixes
 const likedButtons = new Set(); // stores liked button identifiers (catIdx:btnIdx)
 const likedButtonCats = new Set(); // liked button category indices
@@ -922,7 +927,7 @@ function renderSidebar() {
   else if (activeFilter === 'logos') filtered = filtered.filter(s => s.tier === 'Logos');
   else if (activeFilter === 'flags') filtered = filtered.filter(s => s.tier === 'Flags / Maps');
   else if (activeFilter === 'material') filtered = filtered.filter(s => s.tier === 'Material');
-  else if (activeFilter === 'liked') filtered = filtered.filter(s => likedSets.has(s.id) || [...likedIcons].some(ic => ic.startsWith(s.prefix + ':')));
+  else if (activeFilter === 'liked') filtered = filtered.filter(s => likedSets.has(s.id) || likedIconPrefixes.has(s.prefix));
   // Hide sets removed with -
   filtered = filtered.filter(s => !hiddenSets.has(s.id));
 
@@ -1078,11 +1083,15 @@ function loadButtonCat(idx) {
   saveState();
 }
 
+let _searchDebounce = null;
 function filterSets(q) {
   searchFilter = q.toLowerCase();
   searchExact = false;
+  // Sidebar updates instantly for snappy feel
   renderSidebar();
-  renderCanvas();
+  // Canvas re-render is debounced since it's heavier
+  clearTimeout(_searchDebounce);
+  _searchDebounce = setTimeout(() => renderCanvas(), 150);
 }
 
 function filterSetsExact() {
@@ -3424,7 +3433,7 @@ async function renderCanvas() {
       if (activeFilter === 'emoji' && s.tier !== 'Emoji') return false;
       if (activeFilter === 'logos' && s.tier !== 'Logos') return false;
       if (activeFilter === 'material' && s.tier !== 'Material') return false;
-      if (activeFilter === 'liked' && !likedSets.has(s.id) && ![...likedIcons].some(ic => ic.startsWith(s.prefix + ':'))) return false;
+      if (activeFilter === 'liked' && !likedSets.has(s.id) && !likedIconPrefixes.has(s.prefix)) return false;
       return true;
     });
     // Immediately show sets with cached matches or name/author matches
@@ -3446,11 +3455,11 @@ async function renderCanvas() {
       } else {
         canvas.innerHTML = '<div class="empty-state">Searching all icon sets...</div>';
       }
-      const BATCH = 10;
+      const BATCH = 15;
       for (let i = 0; i < uncachedEligible.length; i += BATCH) {
         const batch = uncachedEligible.slice(i, i + BATCH);
         await Promise.all(batch.map(s => fetchIcons(s.prefix)));
-        if (searchFilter !== savedFilter || searchExact !== savedExact) return; // search changed, bail
+        if (searchFilter !== savedFilter || searchExact !== savedExact) return;
         for (const s of batch) {
           const icons = getIcons(s);
           if (icons.length > 0) {
@@ -3458,9 +3467,9 @@ async function renderCanvas() {
             appendSetToCanvas(canvas, s);
           }
         }
-        // Update sidebar with new matches
-        renderSidebar();
       }
+      // Update sidebar once at the end
+      renderSidebar();
       applyAnim();
       return;
     }
@@ -3471,7 +3480,7 @@ async function renderCanvas() {
     if (activeFilter === 'color') displaySets = displaySets.filter(s => s.palette);
     else if (activeFilter === 'animated') displaySets = displaySets.filter(s => s.animated);
     else if (activeFilter === 'stroke') displaySets = displaySets.filter(s => s.stroke);
-    else if (activeFilter === 'liked') displaySets = displaySets.filter(s => likedSets.has(s.id) || [...likedIcons].some(ic => ic.startsWith(s.prefix + ':')));
+    else if (activeFilter === 'liked') displaySets = displaySets.filter(s => likedSets.has(s.id) || likedIconPrefixes.has(s.prefix));
   } else {
     displaySets = SETS.filter(s => activeSets.has(s.id));
   }
@@ -3514,7 +3523,7 @@ async function renderCanvas() {
     renderIconGrid(canvas, readySets);
     if (uncached.length) {
       const currentFilter = activeFilter;
-      const BATCH = 8;
+      const BATCH = 15;
       for (let i = 0; i < uncached.length; i += BATCH) {
         const batch = uncached.slice(i, i + BATCH);
         await Promise.all(batch.map(s => fetchIcons(s.prefix)));
@@ -3754,31 +3763,19 @@ function renderSingleView(canvas, active) {
   </div>`;
 }
 
-function animateIcons() {
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const cell = entry.target;
-        const delay = parseInt(cell.dataset.delay) || 0;
-        setTimeout(() => cell.classList.add('visible'), delay);
-        observer.unobserve(cell);
-      }
-    });
-  }, { rootMargin: '400px' });
+// Single shared observer for icon visibility — no per-cell getBoundingClientRect
+const iconRevealObserver = new IntersectionObserver((entries) => {
+  for (const entry of entries) {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      iconRevealObserver.unobserve(entry.target);
+    }
+  }
+}, { rootMargin: '200px' });
 
+function animateIcons() {
   const cells = document.querySelectorAll('.icon-cell:not(.visible)');
-  if (!cells.length) return;
-  // Calculate row based on vertical position for smooth top-to-bottom reveal
-  const firstTop = cells[0]?.getBoundingClientRect().top || 0;
-  const cellH = cells[0]?.offsetHeight || 58;
-  cells.forEach((cell) => {
-    const top = cell.getBoundingClientRect().top;
-    const row = Math.floor((top - firstTop) / (cellH + 1));
-    const delay = row * 40; // 40ms per row, gentle cascade
-    cell.style.animationDelay = delay + 'ms';
-    cell.addEventListener('animationend', () => { cell.style.animationDelay = ''; }, { once: true });
-    observer.observe(cell);
-  });
+  for (const cell of cells) iconRevealObserver.observe(cell);
 }
 
 function navSingle(dir) { singleIndex += dir; selectedVariant = null; renderCanvas(); }
@@ -3828,10 +3825,10 @@ function rateIcon(iconId, action) {
     if (likedIcons.has(iconId)) likedIcons.delete(iconId);
     else likedIcons.add(iconId);
   } else {
-    // minus: if liked, remove from likes; otherwise hide from view
     if (likedIcons.has(iconId)) likedIcons.delete(iconId);
-    else { hiddenIcons.add(iconId); saveState(); navSingle(1); return; }
+    else { hiddenIcons.add(iconId); updateLikedPrefixes(); saveState(); navSingle(1); return; }
   }
+  updateLikedPrefixes();
   renderCanvas();
   saveState();
 }
@@ -4252,6 +4249,7 @@ function applyState(s) {
   if (s.appMode) setMode(s.appMode);
   if (s.dark) toggleDark();
   if (s.liked) s.liked.forEach(id => likedIcons.add(id));
+  updateLikedPrefixes();
   if (s.hidden) s.hidden.forEach(id => hiddenIcons.add(id));
   if (s.likedSets) { likedSets.clear(); s.likedSets.forEach(id => likedSets.add(id)); }
   if (s.hiddenSets) s.hiddenSets.forEach(id => hiddenSets.add(id));

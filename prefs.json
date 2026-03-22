@@ -3,7 +3,7 @@
   "view": "grid",
   "sortMode": "name",
   "activeFilter": null,
-  "appMode": "icons",
+  "appMode": "buttons",
   "dark": false,
   "liked": [
     "openmoji:person-walking-dark-skin-tone-facing-right",
@@ -59,7 +59,7 @@
     11
   ],
   "activeSet": "__all__",
-  "activeButtonCat": null,
+  "activeButtonCat": 25,
   "activeLoadingCat": null,
   "animIdx": 1,
   "likedAnims": [],
