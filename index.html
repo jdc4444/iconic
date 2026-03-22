@@ -1174,7 +1174,7 @@ async function loadCollections() {
       return a.name.localeCompare(b.name);
     });
     SETS = sets;
-    document.querySelector('title').textContent = `Iconic — ${SETS.length} Sets`;
+    document.querySelector('title').textContent = 'Iconic';
     // Default to All
     if (SETS.length) activeSets.add('__all__');
     buildFsSelect();
