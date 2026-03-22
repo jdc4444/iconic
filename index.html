@@ -352,7 +352,7 @@
     flex-wrap: wrap;
     flex-direction: column;
     align-content: flex-start;
-    gap: 1px;
+    gap: 2px;
     max-height: calc(100vh - var(--topbar-h) - 40px);
     padding-bottom: 4px;
     width: max-content;
@@ -2298,7 +2298,7 @@ function buildSetHtml(s, gridStyle, cellSize, cap = 0) {
 }
 
 function renderIconGrid(canvas, sets) {
-  const cellSize = Math.max(currentScale + 8, 28);
+  const cellSize = Math.max(currentScale + Math.max(12, Math.round(currentScale * 0.15)), 28);
   const isAllOrSearch = activeSets.has('__all__') || !!searchFilter;
   const gridStyle = isAllOrSearch
     ? 'flex-direction:row;align-content:flex-start;max-height:none'
@@ -2354,7 +2354,7 @@ function renderIconGrid(canvas, sets) {
 }
 
 function appendSetToCanvas(canvas, s) {
-  const cellSize = Math.max(currentScale + 8, 28);
+  const cellSize = Math.max(currentScale + Math.max(12, Math.round(currentScale * 0.15)), 28);
   const gridStyle = 'flex-direction:row;align-content:flex-start;max-height:none';
   const isAllOrSearch = activeSets.has('__all__') || !!searchFilter;
   const cap = (activeSets.has('__all__') && !searchFilter) ? ALL_MODE_ICON_CAP : 0;
