@@ -3,7 +3,7 @@
   "view": "grid",
   "sortMode": "name",
   "activeFilter": null,
-  "appMode": "icons",
+  "appMode": "loading",
   "dark": false,
   "liked": [],
   "hidden": [],
@@ -13,11 +13,15 @@
   ],
   "hiddenSets": [],
   "likedLoadingItems": [],
-  "hiddenLoadingItems": [],
+  "hiddenLoadingItems": [
+    "18:14"
+  ],
   "likedLoadingCats": [],
-  "hiddenLoadingCatsList": [],
+  "hiddenLoadingCatsList": [
+    11
+  ],
   "activeSet": "__all__",
-  "activeLoadingCat": null,
+  "activeLoadingCat": 20,
   "animIdx": -1,
   "likedAnims": [],
   "hiddenAnims": [],

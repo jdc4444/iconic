@@ -755,7 +755,7 @@
   @keyframes gyro { 0% { transform: scale(1) rotate(0deg) translateY(calc(var(--radius) * 1%)); } 50% { transform: scale(0.5) rotate(1440deg) translateY(0); } 100% { transform: scale(1) rotate(2920deg) translateY(calc(var(--radius) * 1%)); } }
   .wh-gyro:after, .wh-gyro:before { --radius: 250; animation: gyro 2s infinite linear; background: currentColor; border-radius: 100%; content: ""; height: 20px; width: 20px; position: absolute; }
   .wh-gyro:before { --radius: -250; background: rgba(0,0,0,0.2); }
-  .wh-half-ring:before { animation: btn-spin 1s infinite linear; border-radius: 10px; box-shadow: 25px 0px 0 0 rgba(255, 255, 255, 0.2), 20.2254248594px 14.6946313073px 0 0 rgba(255, 255, 255, 0.4), 7.7254248594px 23.7764129074px 0 0 rgba(255, 255, 255, 0.6), -7.7254248594px 23.7764129074px 0 0 rgba(255, 255, 255, 0.8), -20.2254248594px 14.6946313073px 0 0 white; height: 10px; width: 10px; display: block; content: ""; }
+  .wh-half-ring:before { animation: btn-spin 1s infinite linear; border-radius: 10px; box-shadow: 25px 0px 0 0 rgba(0, 0, 0, 0.15), 20.2254248594px 14.6946313073px 0 0 rgba(0, 0, 0, 0.3), 7.7254248594px 23.7764129074px 0 0 rgba(0, 0, 0, 0.5), -7.7254248594px 23.7764129074px 0 0 rgba(0, 0, 0, 0.7), -20.2254248594px 14.6946313073px 0 0 currentColor; height: 10px; width: 10px; display: block; content: ""; }
   @keyframes line { from { background-position: -60px 0; } to { background-position: 60px 0; } }
   .wh-line:before { animation: line 0.75s infinite alternate ease-in-out; background: linear-gradient(90deg, currentColor, currentColor); background-repeat: no-repeat; background-size: 60px 20px; content: ""; display: block; height: 20px; width: 60px; }
   @keyframes orbit { 0% { opacity: 0; transform: scale(0) translateX(-300%); } 50% { opacity: 1; transform: scale(1.25) translateX(0); } 100% { opacity: 0; transform: scale(0) translateX(300%); } }
@@ -1619,7 +1619,7 @@ const LOADING_CATALOG = [
     L('S20','width: 20px; aspect-ratio: 1; border-radius: 50%; border: 3px solid #514b82; animation: s20-1 0.8s infinite linear alternate, s20-2 1.6s infinite linear'),
     L('S21','width: 20px; aspect-ratio: 1; border-radius: 50%; background: repeating-conic-gradient(#000 0 90deg,#ccc 0 180deg); animation: spin-half 1s infinite linear'),
     L('S25','width: 20px; aspect-ratio: 1; border-radius: 50%; background: #514b82; -webkit-mask: radial-gradient(circle closest-side at 50% 40%,#0000 94%, #000); transform-origin: 50% 40%; animation: spin-full 1s infinite linear'),
-    L('S26','width: 20px; aspect-ratio: 1; display: grid; -webkit-mask: conic-gradient(from 15deg,#0000,#000); animation: spin-full 1s infinite steps(12)'),
+    L('S26','width: 20px; aspect-ratio: 1; display: grid; background: currentColor; -webkit-mask: conic-gradient(from 15deg,#0000,#000); animation: spin-full 1s infinite steps(12)'),
     L('S27','--d: 22px; width: 4px; height: 4px; border-radius: 50%; color: #25b09b; box-shadow: calc(1*var(--d)) calc(0*var(--d)) 0 0, calc(0.707*var(--d)) calc(0.707*var(--d)) 0 1px, calc(0*var(--d)) calc(1*var(--d)) 0 2px, calc(-0.707*var(--d)) calc(0.707*var(--d)) 0 3px, calc(-1*var(--d)) calc(0*var(--d)) 0 4px, calc(-0.707*var(--d)) calc(-0.707*var(--d)) 0 5px, calc(0*var(--d)) calc(-1*var(--d)) 0 6px; animation: spin-full 1s infinite steps(8)'),
     L('D1','width: 60px; aspect-ratio: 4; background: radial-gradient(circle closest-side,#000 90%,#0000) 0/calc(100%/3) 100% space; clip-path: inset(0 100% 0 0); animation: dots1 1s steps(4) infinite'),
     L('D2','width: 60px; aspect-ratio: 4; background: radial-gradient(circle closest-side,#000 90%,#0000) 0/calc(100%/3) 100% no-repeat; animation: dots2 1s steps(3) infinite'),
@@ -1651,8 +1651,8 @@ const LOADING_CATALOG = [
     L('Pulse 1','width: 20px; aspect-ratio: 1; border-radius: 50%; background: #000; box-shadow: 0 0 0 0 #0004; animation: pulse1 1s infinite'),
     L('Pulse 2','width: 20px; aspect-ratio: 1; border-radius: 50%; background: #000; box-shadow: 0 0 0 0 #0004; animation: pulse2 1.5s infinite linear; position: relative'),
     L('Flip 1','width: 40px; aspect-ratio: 1; background: #000; animation: flip1 1s infinite'),
-    L('Flip 2','width: 40px; aspect-ratio: 1; animation: flip2a 2s infinite linear, flip2b 1s infinite steps(1) alternate'),
-    L('Flip 3','width: 40px; aspect-ratio: 1; animation: flip3a 2s infinite linear, flip3b 3s infinite steps(1) -.5s'),
+    L('Flip 2','width: 40px; aspect-ratio: 1; background: currentColor; animation: flip2a 2s infinite linear, flip2b 1s infinite steps(1) alternate'),
+    L('Flip 3','width: 40px; aspect-ratio: 1; background: currentColor; animation: flip3a 2s infinite linear, flip3b 3s infinite steps(1) -.5s'),
     L('Simple circle spin','width: 48px; height: 48px; border: 5px solid #000; border-bottom-color: transparent; border-radius: 50%; display: inline-block; animation: spin-full 1s infinite linear'),
     L('Dual ring','width: 48px; height: 48px; border: 5px solid #000; border-bottom-color: transparent; border-top-color: transparent; border-radius: 50%; animation: spin-full 1s infinite linear'),
     L('Growing dot','width: 12px; height: 12px; border-radius: 50%; background: #000; animation: growingDot 1s ease-in-out infinite'),
