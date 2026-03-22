@@ -1693,10 +1693,17 @@ function getAllVisibleLoading() {
 
 function renderLoadingHtml(item, size) {
   const s = size || 1;
-  const zoom = s !== 1 ? `zoom:${s}` : '';
   const inner = item.inner || '';
   const cls = item.cls ? ` ${item.cls}` : '';
-  return `<div class="loading-item${cls}" style="${item.style};${zoom}">${inner}</div>`;
+  // Parse intrinsic size from style to normalize scale
+  const wMatch = item.style.match(/width:\s*(\d+)px/);
+  const hMatch = item.style.match(/height:\s*(\d+)px/);
+  const intrinsicW = wMatch ? parseInt(wMatch[1]) : 20;
+  const intrinsicH = hMatch ? parseInt(hMatch[1]) : 20;
+  const maxDim = Math.max(intrinsicW, intrinsicH, 1);
+  const targetBase = 28; // normalize everything to 28px
+  const normalizeZoom = (targetBase / maxDim) * s;
+  return `<div class="loading-item${cls}" style="${item.style};zoom:${normalizeZoom}">${inner}</div>`;
 }
 
 function renderLoadingCanvas() {
