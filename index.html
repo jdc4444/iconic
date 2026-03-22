@@ -993,8 +993,7 @@
 <div class="app">
   <div class="sidebar">
     <div class="sidebar-header">
-      <button class="mode-tab active" id="modeIcons" onclick="setMode('icons')">Icons</button>
-      <button class="mode-tab" id="modeLoading" onclick="setMode('loading')">Loading</button>
+      <span style="font-weight:600;font-size:15px;letter-spacing:-0.3px">Iconic</span>
     </div>
     <div class="sidebar-sort" id="sidebarControls"></div>
     <div class="set-list" id="setList"></div>
@@ -1075,7 +1074,7 @@ let sortMode = 'category'; // 'category' or 'name'
 let selectedVariant = null; // specific variant in single view
 let activeFilter = null; // null, 'color', 'animated', 'liked', etc.
 let showAll = true; // All toggle — shows all sets, deselects on nav click
-let appMode = 'icons'; // 'icons' or 'loading'
+let appMode = 'icons'; // legacy, always 'icons' now
 const likedIcons = new Set(); // stores liked icon identifiers (prefix:name)
 const likedIconPrefixes = new Set(); // prefixes that have liked individual icons
 const likedSets = new Set(['lucide', 'lucide-lab']); // liked icon set prefixes
@@ -1125,6 +1124,29 @@ async function loadCollections() {
         tags: info.tags || [],
       });
     }
+    // Add loading categories as pseudo icon sets
+    categories.add('Loading');
+    LOADING_CATALOG.forEach((cat, idx) => {
+      const prefix = '__loading_' + idx;
+      sets.push({
+        id: prefix,
+        prefix: prefix,
+        name: cat.category,
+        tier: 'Loading',
+        count: cat.buttons.length,
+        author: '',
+        license: '',
+        sample: cat.buttons.slice(0, 3).map(b => b.label),
+        palette: false,
+        animated: true,
+        stroke: false,
+        tags: [],
+        type: 'loading',
+        loadingIdx: idx,
+      });
+      // Pre-populate icon cache with loading item labels
+      iconCache[prefix] = cat.buttons.map(b => b.label);
+    });
     // Sort by category then name
     TIER_ORDER = [...categories].sort();
     sets.sort((a, b) => {
@@ -1145,15 +1167,7 @@ async function loadCollections() {
   }
 }
 
-function setMode(mode) {
-  appMode = mode;
-  document.getElementById('modeIcons').classList.toggle('active', mode === 'icons');
-  document.getElementById('modeLoading').classList.toggle('active', mode === 'loading');
-  // Loading defaults to showing all (empty set = all)
-  renderSidebar();
-  renderCanvas();
-  saveState();
-}
+// setMode removed — loading is now integrated into icons
 
 function setSortMode(mode) {
   sortMode = mode;
@@ -1164,7 +1178,7 @@ function setSortMode(mode) {
 function renderSidebar() {
   const el = document.getElementById('setList');
 
-  if (appMode === 'loading') return renderLoadingSidebar(el);
+  // Loading categories are now integrated as regular sets in the sidebar
 
   // Restore icon-mode UI
   document.getElementById('searchInput').placeholder = 'Search sets...';
@@ -1222,11 +1236,7 @@ function renderSidebar() {
 
 function renderControls(mode) {
   const el = document.getElementById('sidebarControls');
-  const modeFilters = mode === 'icons'
-    ? [{ id: 'color', label: 'Color' }, { id: 'animated', label: 'Animated' }, { id: 'stroke', label: 'Stroke' }, { id: 'emoji', label: 'Emoji' }, { id: 'material', label: 'Material' }]
-    : mode === 'loading'
-    ? [{ id: 'dark', label: 'Dark' }]
-    : [];
+  const modeFilters = [{ id: 'color', label: 'Color' }, { id: 'animated', label: 'Animated' }, { id: 'stroke', label: 'Stroke' }, { id: 'emoji', label: 'Emoji' }, { id: 'material', label: 'Material' }];
   const isName = sortMode === 'name';
   const isCat = sortMode === 'category';
   let html = `<button class="sort-btn${isName ? ' active' : ''}" onclick="setSortMode('name')">Name</button>`;
@@ -1275,12 +1285,11 @@ function toggleShowAll() {
   showAll = !showAll;
   if (showAll) {
     // All mode: deselect specific nav selections, but keep filters
-    if (appMode === 'loading') activeLoadingCats.clear();
-    if (appMode === 'icons') { activeSets.clear(); activeSets.add('__all__'); }
+    activeSets.clear(); activeSets.add('__all__');
   }
   renderSidebar();
   renderCanvas();
-  renderControls(appMode);
+  renderControls('icons');
   saveState();
 }
 
@@ -1293,7 +1302,7 @@ function toggleLikedFilter() {
   }
   renderSidebar();
   renderCanvas();
-  renderControls(appMode);
+  renderControls('icons');
   saveState();
 }
 
@@ -1302,7 +1311,7 @@ function toggleFilter(type) {
   // Don't touch showAll — filters are orthogonal to All toggle
   renderSidebar();
   renderCanvas();
-  renderControls(appMode);
+  renderControls('icons');
   saveState();
 }
 
@@ -1316,7 +1325,7 @@ async function loadSet(id) {
     const onclick = el.getAttribute('onclick') || '';
     el.classList.toggle('active', onclick.includes(`'${id}'`));
   });
-  renderControls(appMode);
+  renderControls('icons');
   await renderCanvas();
   syncFsSelect();
   saveState();
@@ -1406,6 +1415,7 @@ function fsSelectSet(val) {
 
 async function fetchIcons(prefix) {
   if (iconCache[prefix]) return iconCache[prefix];
+  if (prefix.startsWith('__loading_')) return iconCache[prefix] || [];
   try {
     const res = await fetch(`https://api.iconify.design/collection?prefix=${prefix}`);
     const data = await res.json();
@@ -2044,7 +2054,7 @@ function navLoadingCat(dir) {
 async function renderCanvas() {
   const canvas = document.getElementById('canvas');
 
-  if (appMode === 'loading') { renderLoadingCanvas(); applyAnim(); return; }
+  // Loading sets are now integrated as regular sets
 
   // Search results scroll vertically; normal view scrolls horizontally
   if (searchFilter) {
@@ -2211,10 +2221,45 @@ function buildSetHtml(s, gridStyle, cellSize, cap = 0) {
   if (!allNames.length) return { html: '', icons: [] };
   const capped = cap > 0 && allNames.length > cap;
   const names = capped ? allNames.slice(0, cap) : allNames;
-  const icons = names.map(n => ({ icon: `${s.prefix}:${n}`, set: s.name, prefix: s.prefix }));
+  const icons = names.map(n => ({ icon: `${s.prefix}:${n}`, set: s.name, prefix: s.prefix, type: s.type }));
   const moreBtn = capped
     ? `<div style="padding:4px 8px;font-size:11px;color:var(--muted);cursor:pointer" onclick="loadSet('${s.id}')">${allNames.length - cap} more →</div>`
     : '';
+
+  // Loading sets render loading animations instead of iconify icons
+  if (s.type === 'loading') {
+    const cat = LOADING_CATALOG[s.loadingIdx];
+    if (!cat) return { html: '', icons: [] };
+    const items = searchFilter
+      ? cat.buttons.filter(b => searchMatch(b.label.toLowerCase(), searchFilter))
+      : cat.buttons;
+    const cappedItems = (cap > 0 && items.length > cap) ? items.slice(0, cap) : items;
+    const loadingIcons = cappedItems.map(b => ({ icon: `${s.prefix}:${b.label}`, set: s.name, prefix: s.prefix, type: 'loading' }));
+    const scaleFactor = currentScale / 48;
+    const loadMoreBtn = (cap > 0 && items.length > cap)
+      ? `<div style="padding:4px 8px;font-size:11px;color:var(--muted);cursor:pointer" onclick="loadSet('${s.id}')">${items.length - cap} more →</div>`
+      : '';
+    const html = `<div class="set-section" data-prefix="${s.prefix}">
+      <div class="set-section-header">
+        <span class="set-section-title">${s.name}</span>
+        <span class="set-section-count">${items.length} loaders</span>
+      </div>
+      <div class="icon-grid" style="${gridStyle}">${cappedItems.map((b, bi) => {
+        const lid = `${s.loadingIdx}:${bi}`;
+        const iLiked = likedLoading.has(lid);
+        return `<div class="icon-cell grid-item-wrap" style="width:${cellSize}px" data-icon="${s.prefix}:${b.label}">
+          <div class="grid-item-rate">
+            <button onclick="event.stopPropagation();rateIcon('${s.prefix}:${b.label}','minus')">&minus;</button>
+            <button class="${iLiked ? 'liked' : ''}" onclick="event.stopPropagation();rateIcon('${s.prefix}:${b.label}','plus')">&plus;</button>
+          </div>
+          ${renderLoadingHtml(b, scaleFactor)}
+          <div class="tooltip">${b.label}</div>
+        </div>`;
+      }).join('')}${loadMoreBtn}</div>
+    </div>`;
+    return { html, icons: loadingIcons };
+  }
+
   const html = `<div class="set-section" data-prefix="${s.prefix}">
     <div class="set-section-header">
       <span class="set-section-title">${s.name}</span>
@@ -2698,14 +2743,14 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
     e.preventDefault();
     const dir = e.key === 'ArrowUp' ? -1 : 1;
-    appMode === 'loading' ? navLoadingCat(dir) : navSet(dir);
+    navSet(dir);
     return;
   }
   if (inInput) return;
   if (e.key === 'f' || e.key === 'F') toggleFullscreen();
   if (e.key === 'd' || e.key === 'D') toggleDark();
-  if (e.key === 'ArrowLeft') { e.preventDefault(); appMode === 'loading' ? navLoadingSingle(-1) : navSingle(-1); }
-  if (e.key === 'ArrowRight') { e.preventDefault(); appMode === 'loading' ? navLoadingSingle(1) : navSingle(1); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); navSingle(-1); }
+  if (e.key === 'ArrowRight') { e.preventDefault(); navSingle(1); }
   if (e.key === ' ') {
     e.preventDefault();
     if (currentView === 'grid') setView('single');
@@ -2761,7 +2806,7 @@ document.getElementById('canvas').addEventListener('wheel', e => {
       singleScrollTimer = setTimeout(() => {
         if (Math.abs(singleScrollAccum) > 30) {
           const d = singleScrollAccum > 0 ? 1 : -1;
-          appMode === 'loading' ? navLoadingSingle(d) : navSingle(d);
+          navSingle(d);
         }
         singleScrollAccum = 0;
         singleScrollTimer = null;
@@ -2770,7 +2815,7 @@ document.getElementById('canvas').addEventListener('wheel', e => {
     return;
   }
   // When searching or in loading grid, allow native vertical scroll
-  if (searchFilter || appMode === 'loading') return;
+  if (searchFilter) return;
   // Map vertical scroll to horizontal on canvas
   const canvas = document.getElementById('canvas');
   e.preventDefault();
@@ -2786,7 +2831,7 @@ function buildState() {
     view: currentView,
     sortMode,
     activeFilter,
-    appMode,
+    // appMode removed — unified view
     dark: document.body.classList.contains('dark'),
     liked: [...likedIcons],
     hidden: [...hiddenIcons],
@@ -2825,7 +2870,7 @@ function applyState(s) {
   // Always open on grid view
   if (s.sortMode) setSortMode(s.sortMode);
   // Don't restore filter — start with no filter active
-  if (s.appMode) setMode(s.appMode);
+  // appMode no longer used
   if (s.dark) toggleDark();
   if (s.liked) s.liked.forEach(id => likedIcons.add(id));
   updateLikedPrefixes();

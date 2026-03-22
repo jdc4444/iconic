@@ -1,9 +1,8 @@
 {
   "scale": 58,
   "view": "grid",
-  "sortMode": "name",
+  "sortMode": "category",
   "activeFilter": null,
-  "appMode": "loading",
   "dark": false,
   "liked": [],
   "hidden": [],
@@ -21,7 +20,7 @@
     11
   ],
   "activeSet": "__all__",
-  "activeLoadingCat": 20,
+  "activeLoadingCat": null,
   "animIdx": -1,
   "likedAnims": [],
   "hiddenAnims": [],
