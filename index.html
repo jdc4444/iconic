@@ -2821,12 +2821,12 @@ document.getElementById('canvas').addEventListener('wheel', e => {
     }
     return;
   }
-  // Allow native vertical scroll in All mode, search, or vertical layout
+  // Allow native scroll in All/search vertical mode
   if (searchFilter || activeSets.has('__all__')) return;
-  // Map vertical scroll to horizontal on canvas (single-set horizontal view)
-  const canvas = document.getElementById('canvas');
-  e.preventDefault();
-  canvas.scrollLeft += e.deltaY + e.deltaX;
+  // In single-set horizontal view, nudge scrollLeft for vertical wheel input
+  if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+    document.getElementById('canvas').scrollLeft += e.deltaY;
+  }
 }, { passive: false });
 
 // Persist state to disk (prefs.json) and localStorage as fallback
