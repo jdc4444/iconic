@@ -2808,9 +2808,9 @@ document.getElementById('canvas').addEventListener('wheel', e => {
     }
     return;
   }
-  // When searching or in loading grid, allow native vertical scroll
-  if (searchFilter) return;
-  // Map vertical scroll to horizontal on canvas
+  // Allow native vertical scroll in All mode, search, or vertical layout
+  if (searchFilter || activeSets.has('__all__')) return;
+  // Map vertical scroll to horizontal on canvas (single-set horizontal view)
   const canvas = document.getElementById('canvas');
   e.preventDefault();
   canvas.scrollLeft += e.deltaY + e.deltaX;
