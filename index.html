@@ -1223,7 +1223,7 @@ function renderSidebar() {
     }
     const active = (activeSets.has(s.id) && !activeSets.has('__all__')) ? ' active' : '';
     const liked = likedSets.has(s.id) ? ' set-liked' : '';
-    html += `<div class="set-item${active}" onclick="loadSet('${s.id}')" onmouseenter="loadSet('${s.id}')">
+    html += `<div class="set-item${active}" onclick="loadSet('${s.id}')" onmouseenter="hoverSet('${s.id}')">
       <div class="dot"></div>
       <div class="set-info"><div class="set-name">${s.name}</div></div>
       <div class="set-count">${s.count.toLocaleString()}</div>
@@ -1318,7 +1318,15 @@ function toggleFilter(type) {
   saveState();
 }
 
+let _hoverDebounce = null;
+function hoverSet(id) {
+  if (showAll) return; // don't switch away from All on hover
+  clearTimeout(_hoverDebounce);
+  _hoverDebounce = setTimeout(() => loadSet(id), 120);
+}
+
 async function loadSet(id) {
+  clearTimeout(_hoverDebounce);
   if (activeSets.size === 1 && activeSets.has(id)) return; // already active
   showAll = false;
   activeSets.clear();
@@ -1843,7 +1851,7 @@ function renderLoadingSidebar(el) {
   for (const f of filtered) {
     const active = activeLoadingCats.has(f.idx) ? ' active' : '';
     const liked = likedLoadingCats.has(f.idx) ? ' set-liked' : '';
-    html += `<div class="set-item${active}" onclick="loadLoadingCat(${f.idx})" onmouseenter="loadLoadingCat(${f.idx})">
+    html += `<div class="set-item${active}" onclick="loadLoadingCat(${f.idx})" onmouseenter="hoverSet('__loading_${f.idx}')">
       <div class="dot"></div>
       <div class="set-info"><div class="set-name">${f.cat.category}</div></div>
       <div class="set-count">${f.count}</div>
