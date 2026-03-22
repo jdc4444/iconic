@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Icon Sampler</title>
+<title>Iconic</title>
 <script src="https://cdn.jsdelivr.net/npm/iconify-icon@3.0.2/dist/iconify-icon.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
@@ -868,7 +868,7 @@ async function loadCollections() {
       return a.name.localeCompare(b.name);
     });
     SETS = sets;
-    document.querySelector('title').textContent = `Icon Sampler — ${SETS.length} Sets`;
+    document.querySelector('title').textContent = `Iconic — ${SETS.length} Sets`;
     // Default to All
     if (SETS.length) activeSets.add('__all__');
     buildFsSelect();
@@ -4194,7 +4194,7 @@ document.getElementById('canvas').addEventListener('wheel', e => {
 }, { passive: false });
 
 // Persist state to disk (prefs.json) and localStorage as fallback
-const STORAGE_KEY = 'icon-sampler-state';
+const STORAGE_KEY = 'iconic-state';
 
 function buildState() {
   return {

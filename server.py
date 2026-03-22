@@ -57,5 +57,5 @@ class Handler(SimpleHTTPRequestHandler):
 
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 3480
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-print(f'Icon Sampler serving on http://localhost:{port}')
+print(f'Iconic serving on http://localhost:{port}')
 HTTPServer(('', port), Handler).serve_forever()
