@@ -619,6 +619,18 @@
     background: var(--hover);
   }
 
+  /* Category grid layout (shared by loading mode) */
+  .btn-cat-section { margin-bottom: 28px; }
+  .btn-cat-header {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px;
+    padding-bottom: 6px; border-bottom: 1px solid var(--border);
+  }
+  .btn-cat-grid { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .btn-cat-grid.dark-bg {
+    background: #1a1a2e; padding: 16px; border-radius: 8px; margin: -4px;
+  }
+
   /* Shared keyframes (used by loading animations) */
   @keyframes btn-spin { to { transform: rotate(360deg); } }
   @keyframes btn-pulse { 0%,100% { box-shadow: 0 0 0 0 var(--pulse-color, rgba(25,118,210,0.5)); } 50% { box-shadow: 0 0 0 10px transparent; } }
