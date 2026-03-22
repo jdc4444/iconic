@@ -3,70 +3,23 @@
   "view": "grid",
   "sortMode": "name",
   "activeFilter": null,
-  "appMode": "buttons",
+  "appMode": "icons",
   "dark": false,
-  "liked": [
-    "openmoji:person-walking-dark-skin-tone-facing-right",
-    "openmoji:man-walking-medium-dark-skin-tone-facing-right",
-    "ls:walking",
-    "zmdi:walk",
-    "grommet-icons:bike",
-    "cil:bike",
-    "streamline-plump:bicycle-bike",
-    "glyphs:bike",
-    "zmdi:bike",
-    "ps:bike"
-  ],
+  "liked": [],
   "hidden": [],
   "likedSets": [
-    "mdi",
-    "heroicons"
+    "lucide",
+    "lucide-lab"
   ],
-  "hiddenSets": [
-    "academicons"
-  ],
-  "likedButtons": [],
-  "hiddenButtons": [
-    "158:0",
-    "158:1",
-    "136:1",
-    "136:0",
-    "145:0",
-    "113:9",
-    "114:8",
-    "92:6"
-  ],
-  "likedButtonCats": [],
-  "hiddenButtonCats": [
-    107,
-    108,
-    109,
-    110,
-    152,
-    33,
-    159,
-    100,
-    34,
-    35,
-    36,
-    153,
-    158
-  ],
+  "hiddenSets": [],
   "likedLoadingItems": [],
   "hiddenLoadingItems": [],
   "likedLoadingCats": [],
-  "hiddenLoadingCatsList": [
-    11
-  ],
+  "hiddenLoadingCatsList": [],
   "activeSet": "__all__",
-  "activeButtonCat": 4,
   "activeLoadingCat": null,
-  "animIdx": 1,
+  "animIdx": -1,
   "likedAnims": [],
-  "hiddenAnims": [
-    "anim-glow",
-    "anim-shimmer",
-    "anim-shake"
-  ],
+  "hiddenAnims": [],
   "sidebarWidth": null
 }
