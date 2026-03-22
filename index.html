@@ -331,7 +331,7 @@
   .canvas::-webkit-scrollbar { height: 6px; }
   .canvas::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-  .set-section { margin-bottom: 8px; }
+  .set-section { margin-bottom: 8px; content-visibility: auto; contain-intrinsic-size: auto 120px; }
 
   .set-section-header {
     display: flex;
@@ -356,7 +356,7 @@
     padding-bottom: 4px;
   }
 
-  @keyframes icon-enter { }
+  /* icon-enter removed for performance */
     from { opacity: 0; }
     to { opacity: 1; }
   }
@@ -372,9 +372,7 @@
     opacity: 0;
   }
 
-  .icon-cell.visible {
-    animation: icon-enter 0.7s ease forwards;
-  }
+  /* .icon-cell.visible animation removed for performance */
 
   .icon-cell:hover { background: var(--hover); }
   .icon-cell iconify-icon { display: block; pointer-events: none; }
@@ -1069,7 +1067,7 @@
 let SETS = [];
 let TIER_ORDER = [];
 let activeSets = new Set();
-let currentScale = 100;
+let currentScale = 70;
 let currentView = 'grid';
 let singleIndex = 0;
 let allVisibleIcons = [];
@@ -2219,7 +2217,7 @@ async function renderCanvas() {
   applyAnim();
 }
 
-const ALL_MODE_ICON_CAP = 24; // max icons per set in All mode grid
+const ALL_MODE_ICON_CAP = 16; // max icons per set in All mode grid
 
 function buildSetHtml(s, gridStyle, cellSize, cap = 0) {
   const allNames = getIcons(s);
@@ -2310,7 +2308,7 @@ function renderIconGrid(canvas, sets) {
           const { html, icons } = buildSetHtml(s, gridStyle, cellSize, cap);
           if (html) {
             el.innerHTML = html;
-            el.querySelector('.icon-grid')?.querySelectorAll('.icon-cell').forEach(cell => cell.classList.add('visible'));
+            // visible class no longer needed
             icons.forEach(ic => allVisibleIcons.push(ic));
             rebindIconClicks(el);
           }
@@ -2356,11 +2354,12 @@ function appendSetToCanvas(canvas, s) {
 }
 
 function rebindIconClicks(root) {
-  // Re-bind click handlers based on current allVisibleIcons order
+  // Build index map for O(1) lookup instead of O(n) findIndex per cell
+  const iconMap = new Map();
+  allVisibleIcons.forEach((ic, i) => { if (!iconMap.has(ic.icon)) iconMap.set(ic.icon, i); });
   (root || document).querySelectorAll('.icon-cell[data-icon]').forEach(cell => {
-    const icon = cell.dataset.icon;
-    const idx = allVisibleIcons.findIndex(ic => ic.icon === icon);
-    if (idx !== -1) cell.onclick = () => openSingle(idx);
+    const idx = iconMap.get(cell.dataset.icon);
+    if (idx !== undefined) cell.onclick = () => openSingle(idx);
   });
 }
 
@@ -2451,18 +2450,8 @@ function renderSingleView(canvas, active) {
 }
 
 // Single shared observer for icon visibility — no per-cell getBoundingClientRect
-const iconRevealObserver = new IntersectionObserver((entries) => {
-  for (const entry of entries) {
-    if (entry.isIntersecting) {
-      entry.target.classList.add('visible');
-      iconRevealObserver.unobserve(entry.target);
-    }
-  }
-}, { rootMargin: '200px' });
-
 function animateIcons() {
-  const cells = document.querySelectorAll('.icon-cell:not(.visible)');
-  for (const cell of cells) iconRevealObserver.observe(cell);
+  // No-op — removed IntersectionObserver animation for performance
 }
 
 function navSingle(dir) { singleIndex += dir; selectedVariant = null; renderCanvas(); }
