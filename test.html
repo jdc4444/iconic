@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iconic Export Roundtrip Test</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Helvetica, Arial, sans-serif; background: #fff; color: #000; padding: 20px; }
+  h1 { margin-bottom: 8px; }
+  #status { margin-bottom: 16px; color: #666; }
+  #summary { margin-bottom: 16px; font-size: 14px; }
+  #summary .pass { color: #2a2; font-weight: bold; }
+  #summary .fail { color: #c22; font-weight: bold; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border: 1px solid #ddd; padding: 6px 8px; vertical-align: top; text-align: center; }
+  th { background: #f5f5f5; position: sticky; top: 0; z-index: 2; }
+  th:first-child, td:first-child { text-align: left; min-width: 160px; position: sticky; left: 0; background: #fff; z-index: 1; }
+  th:first-child { z-index: 3; background: #f5f5f5; }
+  .icon-name { font-family: monospace; font-size: 12px; word-break: break-all; }
+  .cell { min-width: 90px; max-width: 160px; }
+  .cell img, .cell svg { max-width: 48px; max-height: 48px; display: block; margin: 0 auto 4px; }
+  .cell .css-preview { width: 48px; height: 48px; margin: 0 auto 4px; }
+  .cell pre { text-align: left; font-size: 10px; max-height: 80px; overflow: hidden; white-space: pre-wrap; word-break: break-all; background: #f9f9f9; padding: 4px; border-radius: 3px; }
+  .ok { color: #2a2; font-weight: bold; }
+  .err { color: #c22; font-weight: bold; }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #ccc; border-top-color: #333; border-radius: 50%; animation: spin .6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .table-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+
+<h1>Iconic Export Roundtrip Test</h1>
+<div id="status"><span class="spinner"></span> Fetching icon collections...</div>
+<div id="summary"></div>
+<div class="table-wrap">
+  <table id="results">
+    <thead>
+      <tr>
+        <th>Icon</th>
+        <th>SVG</th>
+        <th>PNG</th>
+        <th>JPG</th>
+        <th>WebP</th>
+        <th>CSS</th>
+        <th>Base64</th>
+        <th>React</th>
+        <th>Vue</th>
+        <th>Svelte</th>
+        <th>Swift</th>
+        <th>Kotlin</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<script>
+// ── Conversion functions (copied from iconic/index.html) ──
+
+async function getSVG(iconId) {
+  const [prefix, name] = iconId.split(':');
+  const resp = await fetch(`https://api.iconify.design/${prefix}/${name}.svg`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.text();
+}
+
+function svgToBlob(svg, format, scale = 256) {
+  if (format === 'svg') return Promise.resolve(new Blob([svg], { type: 'image/svg+xml' }));
+  const img = new Image();
+  return new Promise((resolve) => {
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = scale; c.height = scale;
+      const ctx = c.getContext('2d');
+      if (format === 'jpg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, scale, scale); }
+      ctx.drawImage(img, 0, 0, scale, scale);
+      const mime = format === 'jpg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
+      c.toBlob(b => resolve(b), mime, 0.92);
+    };
+    img.onerror = () => resolve(null);
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+}
+
+function svgToCSS(svg, name) {
+  const b64 = btoa(unescape(encodeURIComponent(svg)));
+  return `.icon-${name} {\n  display: inline-block;\n  width: 24px;\n  height: 24px;\n  background: url("data:image/svg+xml;base64,${b64}") no-repeat center/contain;\n}\n`;
+}
+
+function svgToBase64(svg) {
+  return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+}
+
+function svgToReact(svg, name) {
+  const comp = name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
+  const jsx = svg
+    .replace(/class=/g, 'className=')
+    .replace(/clip-path/g, 'clipPath')
+    .replace(/fill-rule/g, 'fillRule')
+    .replace(/stroke-width/g, 'strokeWidth')
+    .replace(/stroke-linecap/g, 'strokeLinecap')
+    .replace(/stroke-linejoin/g, 'strokeLinejoin')
+    .replace(/width="[^"]*"/, 'width={size}')
+    .replace(/height="[^"]*"/, 'height={size}');
+  return `import React from 'react';\n\nexport function ${comp}Icon({ size = 24, ...props }) {\n  return (\n    ${jsx}\n  );\n}\n`;
+}
+
+function svgToVue(svg, name) {
+  const comp = name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
+  return '<template>\n  ' + svg.replace(/width="[^"]*"/, ':width="size"').replace(/height="[^"]*"/, ':height="size"') + '\n<\/template>\n\n<' + 'script>\nexport default {\n  name: \'' + comp + 'Icon\',\n  props: { size: { type: Number, default: 24 } }\n}\n<\/' + 'script>\n';
+}
+
+function svgToSvelte(svg, name) {
+  return '<' + 'script>\n  export let size = 24;\n<\/' + 'script>\n\n' + svg.replace(/width="[^"]*"/, 'width={size}').replace(/height="[^"]*"/, 'height={size}') + '\n';
+}
+
+function svgToSwift(svg, name) {
+  const comp = name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
+  const b64 = btoa(unescape(encodeURIComponent(svg)));
+  return `import SwiftUI\n\nstruct ${comp}Icon: View {\n    var size: CGFloat = 24\n    var body: some View {\n        Image(uiImage: UIImage(data: Data(base64Encoded: "${b64}")!)!)\n            .resizable()\n            .frame(width: size, height: size)\n    }\n}\n`;
+}
+
+function svgToKotlin(svg, name) {
+  const viewBox = svg.match(/viewBox="([^"]+)"/) || ['', '0 0 24 24'];
+  const vb = viewBox[1].split(/\s+/);
+  const paths = [...svg.matchAll(/<path[^>]*d="([^"]+)"[^>]*/g)].map(m => m[1]);
+  const fills = [...svg.matchAll(/<path[^>]*fill="([^"]+)"[^>]*/g)].map(m => m[1]);
+  let xml = `<?xml version="1.0" encoding="utf-8"?>\n<vector xmlns:android="http://schemas.android.com/apk/res/android"\n    android:width="24dp" android:height="24dp"\n    android:viewportWidth="${vb[2]||24}" android:viewportHeight="${vb[3]||24}">\n`;
+  paths.forEach((d, i) => { xml += `    <path android:fillColor="${fills[i]||'#000000'}" android:pathData="${d}" />\n`; });
+  return xml + `</vector>\n`;
+}
+
+// ── Test runner ──
+
+const FORMATS = ['svg', 'png', 'jpg', 'webp', 'css', 'base64', 'react', 'vue', 'svelte', 'swift', 'kotlin'];
+const statusEl = document.getElementById('status');
+const summaryEl = document.getElementById('summary');
+const tbody = document.getElementById('tbody');
+
+let totalTests = 0, passed = 0, failed = 0;
+
+function setStatus(msg) { statusEl.innerHTML = msg; }
+
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function truncate(str, lines = 6) {
+  const parts = str.split('\n');
+  if (parts.length <= lines) return str;
+  return parts.slice(0, lines).join('\n') + '\n...';
+}
+
+function escHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function updateSummary() {
+  summaryEl.innerHTML = `Tests: ${totalTests} | <span class="pass">${passed} passed</span> | <span class="fail">${failed} failed</span>`;
+}
+
+function markCell(td, success, content) {
+  totalTests++;
+  if (success) { passed++; } else { failed++; }
+  const badge = success ? '<span class="ok">&#10003;</span>' : '<span class="err">&#10007;</span>';
+  td.innerHTML = content + '<br>' + badge;
+  updateSummary();
+}
+
+async function renderImageCell(td, svg, format) {
+  try {
+    const blob = await svgToBlob(svg, format);
+    if (!blob || blob.size === 0) { markCell(td, false, '<em>empty blob</em>'); return; }
+    const url = URL.createObjectURL(blob);
+    markCell(td, true, `<img src="${url}" alt="${format}">`);
+  } catch (e) {
+    markCell(td, false, `<em>${escHtml(e.message)}</em>`);
+  }
+}
+
+function renderSVGCell(td, svg) {
+  try {
+    if (!svg || svg.length === 0) { markCell(td, false, '<em>empty</em>'); return; }
+    // Render inline - wrap in a sized container
+    const safe = svg.replace(/<script[\s\S]*?<\/script>/gi, '');
+    markCell(td, true, `<div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;margin:0 auto">${safe}</div>`);
+  } catch (e) {
+    markCell(td, false, `<em>${escHtml(e.message)}</em>`);
+  }
+}
+
+function renderCSSCell(td, svg, iconName) {
+  try {
+    const css = svgToCSS(svg, iconName);
+    if (!css || css.length === 0) { markCell(td, false, '<em>empty</em>'); return; }
+    // Inject a style and show preview div
+    const styleId = 'css-' + iconName + '-' + Math.random().toString(36).slice(2, 8);
+    const styleEl = document.createElement('style');
+    styleEl.textContent = css.replace(`.icon-${iconName}`, `.${styleId}`);
+    document.head.appendChild(styleEl);
+    markCell(td, true, `<div class="css-preview ${styleId}"></div><pre>${escHtml(truncate(css, 4))}</pre>`);
+  } catch (e) {
+    markCell(td, false, `<em>${escHtml(e.message)}</em>`);
+  }
+}
+
+function renderBase64Cell(td, svg) {
+  try {
+    const uri = svgToBase64(svg);
+    if (!uri || uri.length < 30) { markCell(td, false, '<em>empty</em>'); return; }
+    markCell(td, true, `<img src="${uri}" alt="base64" style="max-width:48px;max-height:48px">`);
+  } catch (e) {
+    markCell(td, false, `<em>${escHtml(e.message)}</em>`);
+  }
+}
+
+function renderCodeCell(td, code, label) {
+  try {
+    if (!code || code.length === 0) { markCell(td, false, '<em>empty</em>'); return; }
+    markCell(td, true, `<pre>${escHtml(truncate(code, 6))}</pre>`);
+  } catch (e) {
+    markCell(td, false, `<em>${escHtml(e.message)}</em>`);
+  }
+}
+
+async function testIcon(iconId) {
+  const tr = document.createElement('tr');
+  const nameTd = document.createElement('td');
+  nameTd.className = 'icon-name';
+  nameTd.textContent = iconId;
+  tr.appendChild(nameTd);
+
+  // Create placeholder cells
+  const cells = {};
+  for (const fmt of FORMATS) {
+    const td = document.createElement('td');
+    td.className = 'cell';
+    td.innerHTML = '<span class="spinner"></span>';
+    tr.appendChild(td);
+    cells[fmt] = td;
+  }
+  tbody.appendChild(tr);
+
+  let svg;
+  try {
+    svg = await getSVG(iconId);
+  } catch (e) {
+    // Mark all cells as failed
+    for (const fmt of FORMATS) {
+      markCell(cells[fmt], false, `<em>SVG fetch failed: ${escHtml(e.message)}</em>`);
+    }
+    return;
+  }
+
+  const iconName = iconId.replace(':', '-');
+  const shortName = iconId.split(':')[1] || iconName;
+
+  // SVG
+  renderSVGCell(cells['svg'], svg);
+
+  // PNG, JPG, WebP (async, canvas-based)
+  renderImageCell(cells['png'], svg, 'png');
+  renderImageCell(cells['jpg'], svg, 'jpg');
+  renderImageCell(cells['webp'], svg, 'webp');
+
+  // CSS
+  renderCSSCell(cells['css'], svg, iconName);
+
+  // Base64
+  renderBase64Cell(cells['base64'], svg);
+
+  // React
+  renderCodeCell(cells['react'], svgToReact(svg, shortName), 'React');
+
+  // Vue
+  renderCodeCell(cells['vue'], svgToVue(svg, shortName), 'Vue');
+
+  // Svelte
+  renderCodeCell(cells['svelte'], svgToSvelte(svg, shortName), 'Svelte');
+
+  // Swift
+  renderCodeCell(cells['swift'], svgToSwift(svg, shortName), 'Swift');
+
+  // Kotlin
+  renderCodeCell(cells['kotlin'], svgToKotlin(svg, shortName), 'Kotlin');
+}
+
+async function run() {
+  try {
+    // Step 1: Fetch collection list
+    setStatus('<span class="spinner"></span> Fetching icon collections from Iconify...');
+    const collectionsResp = await fetch('https://api.iconify.design/collections');
+    if (!collectionsResp.ok) throw new Error('Failed to fetch collections');
+    const collections = await collectionsResp.json();
+    const allPrefixes = Object.keys(collections);
+
+    // Step 2: Pick 20 random sets
+    const shuffled = shuffleArray([...allPrefixes]);
+    const selectedSets = shuffled.slice(0, 20);
+    setStatus(`<span class="spinner"></span> Fetching icons from 20 random sets: ${selectedSets.join(', ')}...`);
+
+    // Step 3: From each set, pick a random icon to get 10 total (some sets may fail)
+    const iconIds = [];
+    const setQueue = [...selectedSets];
+
+    while (iconIds.length < 10 && setQueue.length > 0) {
+      // Fetch in batches
+      const batch = setQueue.splice(0, 5);
+      const results = await Promise.allSettled(batch.map(async prefix => {
+        const resp = await fetch(`https://api.iconify.design/collection?prefix=${prefix}`);
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        // Icons can be in uncategorized array or in categories object
+        let icons = [];
+        if (data.uncategorized) icons = icons.concat(data.uncategorized);
+        if (data.categories) {
+          for (const cat of Object.values(data.categories)) {
+            icons = icons.concat(cat);
+          }
+        }
+        if (icons.length === 0) return null;
+        const pick = icons[Math.floor(Math.random() * icons.length)];
+        return `${prefix}:${pick}`;
+      }));
+
+      for (const r of results) {
+        if (r.status === 'fulfilled' && r.value && iconIds.length < 10) {
+          iconIds.push(r.value);
+        }
+      }
+    }
+
+    if (iconIds.length === 0) throw new Error('Could not fetch any icons');
+
+    setStatus(`<span class="spinner"></span> Testing ${iconIds.length} icons across ${FORMATS.length} formats...`);
+
+    // Step 4: Run export tests for each icon
+    for (const iconId of iconIds) {
+      await testIcon(iconId);
+    }
+
+    setStatus(`Done. Tested ${iconIds.length} icons x ${FORMATS.length} formats = ${iconIds.length * FORMATS.length} conversions.`);
+  } catch (e) {
+    setStatus(`<span class="err">Error: ${escHtml(e.message)}</span>`);
+    console.error(e);
+  }
+}
+
+run();
+</script>
+</body>
+</html>
