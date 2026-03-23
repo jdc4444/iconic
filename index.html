@@ -1075,6 +1075,7 @@ let sortMode = 'category'; // 'category' or 'name'
 let selectedVariant = null; // specific variant in single view
 let activeFilter = null; // null, 'color', 'animated', 'liked', etc.
 let showAll = true; // All toggle — shows all sets, deselects on nav click
+let _allScrollPos = 0; // remember scroll position when leaving All mode
 let appMode = 'icons'; // legacy, always 'icons' now
 const likedIcons = new Set(); // stores liked icon identifiers (prefix:name)
 const likedIconPrefixes = new Set(); // prefixes that have liked individual icons
@@ -1291,6 +1292,9 @@ function toggleShowAll() {
   renderSidebar();
   renderCanvas();
   renderControls('icons');
+  if (showAll && _allScrollPos > 0) {
+    requestAnimationFrame(() => { document.getElementById('canvas').scrollTop = _allScrollPos; });
+  }
   saveState();
 }
 
@@ -1326,6 +1330,8 @@ function hoverSet(id) {
 async function loadSet(id) {
   clearTimeout(_hoverDebounce);
   if (activeSets.size === 1 && activeSets.has(id)) return; // already active
+  // Save scroll position when leaving All mode
+  if (showAll) _allScrollPos = document.getElementById('canvas').scrollTop;
   showAll = false;
   activeSets.clear();
   activeSets.add(id);
@@ -2253,7 +2259,7 @@ function buildSetHtml(s, gridStyle, cellSize, cap = 0) {
       ? `<div style="padding:4px 8px;font-size:11px;color:var(--muted);cursor:pointer" onclick="loadSet('${s.id}')">${items.length - cap} more →</div>`
       : '';
     const html = `<div class="set-section" data-prefix="${s.prefix}">
-      <div class="set-section-header">
+      <div class="set-section-header" style="cursor:pointer" onclick="loadSet('${s.id}')">
         <span class="set-section-title">${s.name}</span>
         <span class="set-section-count">${items.length} loaders</span>
       </div>
@@ -2274,7 +2280,7 @@ function buildSetHtml(s, gridStyle, cellSize, cap = 0) {
   }
 
   const html = `<div class="set-section" data-prefix="${s.prefix}">
-    <div class="set-section-header">
+    <div class="set-section-header" style="cursor:pointer" onclick="loadSet('${s.id}')">
       <span class="set-section-title">${s.name}</span>
       <span class="set-section-count">${allNames.length.toLocaleString()} icons · ${s.license}</span>
       <span class="set-section-author">${s.author}</span>
