@@ -2823,15 +2823,13 @@ document.getElementById('canvas').addEventListener('wheel', e => {
     }
     return;
   }
-  // Allow native vertical scroll in All/search mode
+  // Allow native scroll in All/search mode
   if (searchFilter || activeSets.has('__all__')) return;
-  // Single-set horizontal view: map vertical to horizontal, prevent page bounce
-  const canvas = document.getElementById('canvas');
-  const atStart = canvas.scrollLeft <= 0 && e.deltaY < 0;
-  const atEnd = canvas.scrollLeft >= canvas.scrollWidth - canvas.clientWidth - 1 && e.deltaY > 0;
-  if (!atStart && !atEnd) {
+  // Single-set horizontal: only intercept vertical wheel to map horizontal
+  // Let native deltaX (trackpad swipe) pass through untouched
+  if (Math.abs(e.deltaY) > 5 && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
     e.preventDefault();
-    canvas.scrollLeft += e.deltaY;
+    document.getElementById('canvas').scrollLeft += e.deltaY;
   }
 }, { passive: false });
 
