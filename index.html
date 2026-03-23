@@ -350,8 +350,15 @@
   .icon-grid {
     display: flex;
     flex-wrap: wrap;
+    flex-direction: column;
+    align-content: flex-start;
     gap: 1px;
+    max-height: calc(100vh - var(--topbar-h) - 40px);
     padding-bottom: 4px;
+  }
+  .canvas.vertical-mode .icon-grid {
+    flex-direction: row;
+    max-height: none;
   }
 
   .icon-cell {
@@ -2058,10 +2065,18 @@ async function renderCanvas() {
 
   // Loading sets are now integrated as regular sets
 
-  // All views scroll vertically
-  canvas.style.overflowY = 'auto';
-  canvas.style.overflowX = 'hidden';
-  canvas.style.flexDirection = 'column';
+  // All/search scroll vertically; single-set scrolls horizontally
+  const isVertical = !!searchFilter || activeSets.has('__all__');
+  canvas.classList.toggle('vertical-mode', isVertical);
+  if (isVertical) {
+    canvas.style.overflowY = 'auto';
+    canvas.style.overflowX = 'hidden';
+    canvas.style.flexDirection = 'column';
+  } else {
+    canvas.style.overflowY = 'hidden';
+    canvas.style.overflowX = 'auto';
+    canvas.style.flexDirection = '';
+  }
 
   // When searching, show matching icons from ALL sets (fetched on demand)
   // When not searching, show only the active/selected set(s)
@@ -2333,7 +2348,7 @@ function renderIconGrid(canvas, sets) {
 
 function appendSetToCanvas(canvas, s) {
   const cellSize = Math.max(currentScale + Math.max(12, Math.round(currentScale * 0.15)), 28);
-  const gridStyle = 'flex-direction:row;align-content:flex-start;max-height:none';
+  const gridStyle = '';
   const isAllOrSearch = activeSets.has('__all__') || !!searchFilter;
   const cap = (activeSets.has('__all__') && !searchFilter) ? ALL_MODE_ICON_CAP : 0;
   const { html, icons } = buildSetHtml(s, gridStyle, cellSize, cap);
@@ -2799,7 +2814,12 @@ document.getElementById('canvas').addEventListener('wheel', e => {
     }
     return;
   }
-  // Native vertical scroll handles everything
+  // Vertical mode: native scroll handles it
+  if (searchFilter || activeSets.has('__all__')) return;
+  // Horizontal mode (single-set): map vertical wheel to horizontal
+  const canvas = document.getElementById('canvas');
+  e.preventDefault();
+  canvas.scrollLeft += e.deltaY + e.deltaX;
 }, { passive: false });
 
 // Persist state to disk (prefs.json) and localStorage as fallback
