@@ -329,7 +329,7 @@
 
   .tb-btn { padding: 4px 10px; }
 
-  .canvas { flex: 1; overflow-x: auto; overflow-y: hidden; padding: 20px; -webkit-overflow-scrolling: touch; }
+  .canvas { flex: 1; overflow-x: hidden; overflow-y: auto; padding: 20px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
   .canvas::-webkit-scrollbar { height: 6px; }
   .canvas::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
@@ -352,10 +352,9 @@
   .icon-grid {
     display: flex;
     flex-wrap: wrap;
-    flex-direction: column;
+    flex-direction: row;
     align-content: flex-start;
     gap: 2px;
-    max-height: calc(100vh - var(--topbar-h) - 40px);
     padding-bottom: 4px;
     width: max-content;
     min-width: 100%;
@@ -2072,18 +2071,11 @@ async function renderCanvas() {
 
   // Loading sets are now integrated as regular sets
 
-  // Search/All results scroll vertically; single-set scrolls horizontally
-  const isVertical = !!searchFilter || activeSets.has('__all__');
-  canvas.classList.toggle('vertical-scroll', isVertical);
-  if (isVertical) {
-    canvas.style.overflowY = 'auto';
-    canvas.style.overflowX = 'hidden';
-    canvas.style.flexDirection = 'column';
-  } else {
-    canvas.style.overflowY = 'hidden';
-    canvas.style.overflowX = 'auto';
-    canvas.style.flexDirection = '';
-  }
+  // Everything scrolls vertically now
+  canvas.classList.add('vertical-scroll');
+  canvas.style.overflowY = 'auto';
+  canvas.style.overflowX = 'hidden';
+  canvas.style.flexDirection = 'column';
 
   // When searching, show matching icons from ALL sets (fetched on demand)
   // When not searching, show only the active/selected set(s)
@@ -2823,11 +2815,7 @@ document.getElementById('canvas').addEventListener('wheel', e => {
     }
     return;
   }
-  // Allow native scroll in All/search mode
-  if (searchFilter || activeSets.has('__all__')) return;
-  // Single-set horizontal: map vertical wheel to horizontal scroll
-  // No preventDefault — let browser handle natively, we just assist
-  document.getElementById('canvas').scrollLeft += e.deltaY;
+  // All views are vertical — let native scroll handle it
 }, { passive: false });
 
 // Persist state to disk (prefs.json) and localStorage as fallback
