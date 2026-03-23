@@ -350,10 +350,7 @@
   .icon-grid {
     display: flex;
     flex-wrap: wrap;
-    flex-direction: column;
-    align-content: flex-start;
     gap: 1px;
-    max-height: calc(100vh - var(--topbar-h) - 40px);
     padding-bottom: 4px;
   }
 
@@ -2061,18 +2058,10 @@ async function renderCanvas() {
 
   // Loading sets are now integrated as regular sets
 
-  // Search results scroll vertically; normal view scrolls horizontally
-  const isVertical = !!searchFilter || activeSets.has('__all__');
-  canvas.classList.toggle('vertical-scroll', isVertical);
-  if (isVertical) {
-    canvas.style.overflowY = 'auto';
-    canvas.style.overflowX = 'hidden';
-    canvas.style.flexDirection = 'column';
-  } else {
-    canvas.style.overflowY = 'hidden';
-    canvas.style.overflowX = 'auto';
-    canvas.style.flexDirection = '';
-  }
+  // All views scroll vertically
+  canvas.style.overflowY = 'auto';
+  canvas.style.overflowX = 'hidden';
+  canvas.style.flexDirection = 'column';
 
   // When searching, show matching icons from ALL sets (fetched on demand)
   // When not searching, show only the active/selected set(s)
@@ -2291,9 +2280,7 @@ function buildSetHtml(s, gridStyle, cellSize, cap = 0) {
 function renderIconGrid(canvas, sets) {
   const cellSize = Math.max(currentScale + Math.max(12, Math.round(currentScale * 0.15)), 28);
   const isAllOrSearch = activeSets.has('__all__') || !!searchFilter;
-  const gridStyle = isAllOrSearch
-    ? 'flex-direction:row;align-content:flex-start;max-height:none'
-    : '';
+  const gridStyle = '';
   const cap = (activeSets.has('__all__') && !searchFilter) ? ALL_MODE_ICON_CAP : 0;
 
   allVisibleIcons = [];
@@ -2812,12 +2799,7 @@ document.getElementById('canvas').addEventListener('wheel', e => {
     }
     return;
   }
-  // Allow native vertical scroll in All mode or search
-  if (searchFilter || activeSets.has('__all__')) return;
-  // Map vertical scroll to horizontal on canvas (single-set horizontal view)
-  const canvas = document.getElementById('canvas');
-  e.preventDefault();
-  canvas.scrollLeft += e.deltaY + e.deltaX;
+  // Native vertical scroll handles everything
 }, { passive: false });
 
 // Persist state to disk (prefs.json) and localStorage as fallback
