@@ -9,6 +9,7 @@
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
 
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  html { overflow: hidden; height: 100%; }
 
   :root {
     --bg: #fff;
@@ -2824,12 +2825,9 @@ document.getElementById('canvas').addEventListener('wheel', e => {
   }
   // Allow native scroll in All/search mode
   if (searchFilter || activeSets.has('__all__')) return;
-  // Single-set horizontal: only intercept vertical wheel to map horizontal
-  // Let native deltaX (trackpad swipe) pass through untouched
-  if (Math.abs(e.deltaY) > 5 && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-    e.preventDefault();
-    document.getElementById('canvas').scrollLeft += e.deltaY;
-  }
+  // Single-set horizontal: map vertical wheel to horizontal scroll
+  // No preventDefault — let browser handle natively, we just assist
+  document.getElementById('canvas').scrollLeft += e.deltaY;
 }, { passive: false });
 
 // Persist state to disk (prefs.json) and localStorage as fallback
