@@ -3092,10 +3092,38 @@ async function exportReact(iconId) {
   triggerTextDownload(component, name + 'Icon.jsx', 'text/javascript');
 }
 
-async function exportSetZip(setId) {
+async function svgToBlob(svg, format, scale = 256) {
+  if (format === 'svg') return new Blob([svg], { type: 'image/svg+xml' });
+  const img = new Image();
+  return new Promise((resolve) => {
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = scale; c.height = scale;
+      const ctx = c.getContext('2d');
+      if (format === 'jpg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, scale, scale); }
+      ctx.drawImage(img, 0, 0, scale, scale);
+      const mime = format === 'jpg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
+      c.toBlob(resolve, mime, 0.92);
+    };
+    img.onerror = () => resolve(null);
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+}
+
+function svgToReact(svg, name) {
+  const comp = name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
+  const jsx = svg.replace(/class=/g, 'className=').replace(/clip-path/g, 'clipPath').replace(/fill-rule/g, 'fillRule').replace(/stroke-width/g, 'strokeWidth').replace(/stroke-linecap/g, 'strokeLinecap').replace(/stroke-linejoin/g, 'strokeLinejoin').replace(/width="[^"]*"/, 'width={size}').replace(/height="[^"]*"/, 'height={size}');
+  return `import React from 'react';\n\nexport function ${comp}Icon({ size = 24, ...props }) {\n  return (\n    ${jsx}\n  );\n}\n`;
+}
+
+function svgToCSS(svg, name) {
+  const b64 = btoa(unescape(encodeURIComponent(svg)));
+  return `.icon-${name} {\n  display: inline-block;\n  width: 24px;\n  height: 24px;\n  background: url("data:image/svg+xml;base64,${b64}") no-repeat center/contain;\n}\n`;
+}
+
+async function exportSetZip(setId, format = 'svg') {
   if (typeof JSZip === 'undefined') { alert('JSZip not loaded'); return; }
   const zip = new JSZip();
-  // Fetch full set data
   let data = svgCache.get('__set_' + setId);
   if (!data) {
     data = await fetch(`https://api.iconify.design/${setId}.json`).then(r => r.json());
@@ -3103,18 +3131,28 @@ async function exportSetZip(setId) {
   }
   const icons = Object.keys(data.icons || {});
   const folder = zip.folder(setId);
-  // Fetch SVGs in parallel batches of 20
+  const ext = format === 'react' ? '.jsx' : format === 'css' ? '.css' : '.' + format;
+
   for (let i = 0; i < icons.length; i += 20) {
     const batch = icons.slice(i, i + 20);
     await Promise.all(batch.map(async (name) => {
       try {
         const svg = await fetch(`https://api.iconify.design/${setId}/${name}.svg`).then(r => r.text());
-        folder.file(name + '.svg', svg);
+        if (format === 'svg') {
+          folder.file(name + ext, svg);
+        } else if (format === 'react') {
+          folder.file(name + ext, svgToReact(svg, name));
+        } else if (format === 'css') {
+          folder.file(name + ext, svgToCSS(svg, name));
+        } else {
+          const blob = await svgToBlob(svg, format);
+          if (blob) folder.file(name + ext, blob);
+        }
       } catch {}
     }));
   }
   const blob = await zip.generateAsync({ type: 'blob' });
-  triggerDownload(blob, setId + '-icons.zip');
+  triggerDownload(blob, setId + '-' + format + '.zip');
 }
 
 let _exportMenu = null;
@@ -3142,9 +3180,16 @@ function showExportMenu(event, type, id) {
     html += `<button onclick="exportReact('${id}');closeExportMenu()">React Component</button>`;
     html += `</div>`;
   } else if (isSet) {
-    html += `<button onclick="exportSetZip('${id}');closeExportMenu()">Download All SVGs (.zip)</button>`;
-    html += `<button onclick="exportSVG('${id}:' + (iconCache['${id}'] || [])[0]);closeExportMenu()">SVG (first icon)</button>`;
-    html += `<button onclick="exportPNG('${id}:' + (iconCache['${id}'] || [])[0]);closeExportMenu()">PNG (first icon)</button>`;
+    html += `<button onclick="exportSetZip('${id}','svg');closeExportMenu()">SVG (.zip)</button>`;
+    html += `<button onclick="exportSetZip('${id}','png');closeExportMenu()">PNG (.zip)</button>`;
+    html += `<button onclick="exportSetZip('${id}','css');closeExportMenu()">CSS (.zip)</button>`;
+    html += `<div class="export-divider"></div>`;
+    html += `<button class="export-more" onclick="this.parentElement.querySelector('.export-extra').style.display='block';this.style.display='none'">+ More formats</button>`;
+    html += `<div class="export-extra" style="display:none">`;
+    html += `<button onclick="exportSetZip('${id}','jpg');closeExportMenu()">JPG (.zip)</button>`;
+    html += `<button onclick="exportSetZip('${id}','webp');closeExportMenu()">WebP (.zip)</button>`;
+    html += `<button onclick="exportSetZip('${id}','react');closeExportMenu()">React Components (.zip)</button>`;
+    html += `</div>`;
   } else if (isLoading) {
     html += `<button onclick="alert('Loading CSS export coming soon');closeExportMenu()">CSS</button>`;
     html += `<button onclick="alert('Loading PNG export coming soon');closeExportMenu()">PNG</button>`;
