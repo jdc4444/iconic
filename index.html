@@ -2967,15 +2967,7 @@ let _lastHighlighted = '';
 
 function buildSectionOffsets() {} // no-op, kept for compat
 
-function highlightSidebarForScroll() {
-  const canvas = document.getElementById('canvas');
-  const canvasTop = canvas.getBoundingClientRect().top;
-  const sections = canvas.querySelectorAll('.set-section[data-prefix]');
-  let prefix = '';
-  for (const sec of sections) {
-    const r = sec.getBoundingClientRect();
-    if (r.bottom > canvasTop + 60) { prefix = sec.dataset.prefix; break; }
-  }
+function highlightSidebarForPrefix(prefix) {
   if (!prefix || prefix === _lastHighlighted) return;
   _lastHighlighted = prefix;
   const items = document.querySelectorAll('.set-item');
@@ -2989,9 +2981,14 @@ function highlightSidebarForScroll() {
   if (found) found.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
-document.getElementById('canvas').addEventListener('scroll', () => {
+// Track mouse position over canvas — highlight sidebar based on hovered section
+document.getElementById('canvas').addEventListener('mousemove', (e) => {
   if (!activeSets.has('__all__') && !searchFilter) return;
-  highlightSidebarForScroll();
+  // Find which set-section the mouse is over
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  if (!el) return;
+  const section = el.closest('.set-section[data-prefix]');
+  if (section) highlightSidebarForPrefix(section.dataset.prefix);
 }, { passive: true });
 
 restoreState().then(() => { updateAnimUI(); loadCollections(); });
