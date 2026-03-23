@@ -2821,11 +2821,15 @@ document.getElementById('canvas').addEventListener('wheel', e => {
     }
     return;
   }
-  // Allow native scroll in All/search vertical mode
+  // Allow native vertical scroll in All/search mode
   if (searchFilter || activeSets.has('__all__')) return;
-  // In single-set horizontal view, nudge scrollLeft for vertical wheel input
-  if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-    document.getElementById('canvas').scrollLeft += e.deltaY;
+  // Single-set horizontal view: map vertical to horizontal, prevent page bounce
+  const canvas = document.getElementById('canvas');
+  const atStart = canvas.scrollLeft <= 0 && e.deltaY < 0;
+  const atEnd = canvas.scrollLeft >= canvas.scrollWidth - canvas.clientWidth - 1 && e.deltaY > 0;
+  if (!atStart && !atEnd) {
+    e.preventDefault();
+    canvas.scrollLeft += e.deltaY;
   }
 }, { passive: false });
 
