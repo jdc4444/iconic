@@ -2129,6 +2129,7 @@ async function renderCanvas() {
       // Update sidebar once at the end
       renderSidebar();
       applyAnim();
+      setupSectionObserver();
       return;
     }
   } else if (activeSets.has('__all__')) {
@@ -2223,6 +2224,7 @@ async function renderCanvas() {
   if (currentView === 'single' || currentView === 'versions') { renderSingleView(canvas, displaySets); applyAnim(); return; }
   renderIconGrid(canvas, displaySets);
   applyAnim();
+  if (activeSets.has('__all__') || searchFilter) setupSectionObserver();
 }
 
 const ALL_MODE_ICON_CAP = 16; // max icons per set in All mode grid
@@ -2954,36 +2956,42 @@ async function restoreState() {
   } catch {}
 }
 
-// Track visible set in All mode — sync sidebar highlight with canvas scroll
-let _scrollTrackTimer = null;
-let _lastTrackedPrefix = '';
-document.getElementById('canvas').addEventListener('scroll', () => {
-  if (!activeSets.has('__all__') && !searchFilter) return;
-  clearTimeout(_scrollTrackTimer);
-  _scrollTrackTimer = setTimeout(() => {
-    const canvas = document.getElementById('canvas');
-    const sections = canvas.querySelectorAll('.set-section[data-prefix]');
-    let topSection = null;
-    const canvasTop = canvas.getBoundingClientRect().top;
-    for (const sec of sections) {
-      const r = sec.getBoundingClientRect();
-      if (r.bottom > canvasTop + 60) { topSection = sec; break; }
+// Track visible set — IntersectionObserver syncs sidebar to canvas
+let _sectionObserver = null;
+let _visibleSections = new Set();
+let _lastHighlighted = '';
+
+function setupSectionObserver() {
+  if (_sectionObserver) _sectionObserver.disconnect();
+  _visibleSections.clear();
+  const canvas = document.getElementById('canvas');
+  _sectionObserver = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      const p = e.target.dataset.prefix;
+      if (!p) continue;
+      if (e.isIntersecting) _visibleSections.add(p);
+      else _visibleSections.delete(p);
     }
-    if (!topSection) return;
-    const prefix = topSection.dataset.prefix;
-    if (prefix === _lastTrackedPrefix) return;
-    _lastTrackedPrefix = prefix;
+    // Find the topmost visible section
+    const sections = canvas.querySelectorAll('.set-section[data-prefix]');
+    let topPrefix = '';
+    for (const sec of sections) {
+      if (_visibleSections.has(sec.dataset.prefix)) { topPrefix = sec.dataset.prefix; break; }
+    }
+    if (!topPrefix || topPrefix === _lastHighlighted) return;
+    _lastHighlighted = topPrefix;
     const items = document.querySelectorAll('.set-item');
     let found = null;
     for (const item of items) {
       const onclick = item.getAttribute('onclick') || '';
-      const isThis = onclick.includes(`'${prefix}'`);
+      const isThis = onclick.includes(`'${topPrefix}'`);
       item.classList.toggle('active', isThis);
       if (isThis) found = item;
     }
     if (found) found.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, 100);
-});
+  }, { root: canvas, rootMargin: '0px', threshold: 0 });
+  canvas.querySelectorAll('.set-section[data-prefix]').forEach(sec => _sectionObserver.observe(sec));
+}
 
 restoreState().then(() => { updateAnimUI(); loadCollections(); });
 </script>
