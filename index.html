@@ -40,6 +40,8 @@
     color: var(--fg);
     height: 100vh;
     overflow: hidden;
+    overscroll-behavior: none;
+    overflow: hidden;
     font-size: 13px;
     -webkit-font-smoothing: antialiased;
   }
@@ -327,7 +329,7 @@
 
   .tb-btn { padding: 4px 10px; }
 
-  .canvas { flex: 1; overflow-x: auto; overflow-y: hidden; padding: 20px; }
+  .canvas { flex: 1; overflow-x: auto; overflow-y: hidden; padding: 20px; overscroll-behavior: contain; }
   .canvas::-webkit-scrollbar { height: 6px; }
   .canvas::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
