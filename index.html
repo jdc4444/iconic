@@ -2495,7 +2495,30 @@ function rateSet(id, action) {
     else likedSets.add(id);
   } else {
     if (likedSets.has(id)) likedSets.delete(id);
-    else hiddenSets.add(id);
+    else {
+      hiddenSets.add(id);
+      // Animate out set section in main panel
+      const section = document.querySelector(`.set-section[data-prefix="${id}"]`);
+      if (section) {
+        section.style.transition = 'opacity 0.25s, max-height 0.3s';
+        section.style.opacity = '0';
+        section.style.maxHeight = section.offsetHeight + 'px';
+        section.style.overflow = 'hidden';
+        requestAnimationFrame(() => { section.style.maxHeight = '0'; });
+        setTimeout(() => section.remove(), 300);
+      }
+      // Animate out sidebar item
+      const sideItem = document.querySelector(`.set-item[onclick*="'${id}'"]`);
+      if (sideItem) {
+        sideItem.style.transition = 'opacity 0.2s, max-height 0.2s';
+        sideItem.style.opacity = '0';
+        sideItem.style.maxHeight = '0';
+        sideItem.style.overflow = 'hidden';
+        setTimeout(() => sideItem.remove(), 200);
+      }
+      saveState();
+      return;
+    }
   }
   renderSidebar();
   saveState();
@@ -2930,6 +2953,35 @@ async function restoreState() {
     if (raw) applyState(JSON.parse(raw));
   } catch {}
 }
+
+// Track visible set in All mode — sync sidebar highlight with canvas scroll
+let _scrollTrackRAF = null;
+document.getElementById('canvas').addEventListener('scroll', () => {
+  if (!activeSets.has('__all__') && !searchFilter) return;
+  if (_scrollTrackRAF) return;
+  _scrollTrackRAF = requestAnimationFrame(() => {
+    _scrollTrackRAF = null;
+    const canvas = document.getElementById('canvas');
+    const sections = canvas.querySelectorAll('.set-section[data-prefix]');
+    let topSection = null;
+    const canvasTop = canvas.getBoundingClientRect().top;
+    for (const sec of sections) {
+      const r = sec.getBoundingClientRect();
+      if (r.bottom > canvasTop + 60) { topSection = sec; break; }
+    }
+    if (!topSection) return;
+    const prefix = topSection.dataset.prefix;
+    const items = document.querySelectorAll('.set-item');
+    let found = null;
+    for (const item of items) {
+      const onclick = item.getAttribute('onclick') || '';
+      const isThis = onclick.includes(`'${prefix}'`);
+      item.classList.toggle('active', isThis);
+      if (isThis) found = item;
+    }
+    if (found) found.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+});
 
 restoreState().then(() => { updateAnimUI(); loadCollections(); });
 </script>
