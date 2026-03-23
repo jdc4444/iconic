@@ -357,10 +357,6 @@
     padding-bottom: 4px;
   }
 
-  /* icon-enter removed for performance */
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
   .icon-cell {
     display: flex;
     align-items: center;
@@ -370,10 +366,7 @@
     transition: background 0.15s;
     cursor: pointer;
     position: relative;
-    opacity: 0;
   }
-
-  /* .icon-cell.visible animation removed for performance */
 
   .icon-cell:hover { background: var(--hover); }
   .icon-cell iconify-icon { display: block; pointer-events: none; }
