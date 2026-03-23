@@ -3131,7 +3131,8 @@ async function exportSetZip(setId, format = 'svg') {
   }
   const icons = Object.keys(data.icons || {});
   const folder = zip.folder(setId);
-  const ext = format === 'react' ? '.jsx' : format === 'css' ? '.css' : '.' + format;
+  const extMap = { react: '.jsx', css: '.css', vue: '.vue', svelte: '.svelte', swift: '.swift', kotlin: '.xml' };
+  const ext = extMap[format] || ('.' + format);
 
   for (let i = 0; i < icons.length; i += 20) {
     const batch = icons.slice(i, i + 20);
@@ -3144,6 +3145,14 @@ async function exportSetZip(setId, format = 'svg') {
           folder.file(name + ext, svgToReact(svg, name));
         } else if (format === 'css') {
           folder.file(name + ext, svgToCSS(svg, name));
+        } else if (format === 'vue') {
+          folder.file(name + ext, svgToVue(svg, name));
+        } else if (format === 'svelte') {
+          folder.file(name + ext, svgToSvelte(svg, name));
+        } else if (format === 'swift') {
+          folder.file(name + ext, svgToSwift(svg, name));
+        } else if (format === 'kotlin') {
+          folder.file(name + ext, svgToKotlin(svg, name));
         } else {
           const blob = await svgToBlob(svg, format);
           if (blob) folder.file(name + ext, blob);
@@ -3153,6 +3162,148 @@ async function exportSetZip(setId, format = 'svg') {
   }
   const blob = await zip.generateAsync({ type: 'blob' });
   triggerDownload(blob, setId + '-' + format + '.zip');
+}
+
+// ── Format converters for zip export ──
+function svgToVue(svg, name) {
+  const comp = name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
+  return `<template>\n  ${svg.replace(/width="[^"]*"/, ':width="size"').replace(/height="[^"]*"/, ':height="size"')}\n</template>\n\n<script>\nexport default {\n  name: '${comp}Icon',\n  props: { size: { type: Number, default: 24 } }\n}\n</script>\n`;
+}
+function svgToSvelte(svg, name) {
+  return `<script>\n  export let size = 24;\n</script>\n\n${svg.replace(/width="[^"]*"/, 'width={size}').replace(/height="[^"]*"/, 'height={size}')}\n`;
+}
+function svgToSwift(svg, name) {
+  const comp = name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
+  const b64 = btoa(unescape(encodeURIComponent(svg)));
+  return `import SwiftUI\n\nstruct ${comp}Icon: View {\n    var size: CGFloat = 24\n    var body: some View {\n        Image(uiImage: UIImage(data: Data(base64Encoded: "${b64}")!)!)\n            .resizable()\n            .frame(width: size, height: size)\n    }\n}\n`;
+}
+function svgToKotlin(svg, name) {
+  const viewBox = svg.match(/viewBox="([^"]+)"/) || ['', '0 0 24 24'];
+  const vb = viewBox[1].split(/\s+/);
+  const paths = [...svg.matchAll(/<path[^>]*d="([^"]+)"[^>]*/g)].map(m => m[1]);
+  const fills = [...svg.matchAll(/<path[^>]*fill="([^"]+)"[^>]*/g)].map(m => m[1]);
+  let xml = `<?xml version="1.0" encoding="utf-8"?>\n<vector xmlns:android="http://schemas.android.com/apk/res/android"\n    android:width="24dp" android:height="24dp"\n    android:viewportWidth="${vb[2]||24}" android:viewportHeight="${vb[3]||24}">\n`;
+  paths.forEach((d, i) => { xml += `    <path android:fillColor="${fills[i]||'#000000'}" android:pathData="${d}" />\n`; });
+  return xml + `</vector>\n`;
+}
+
+// ── Additional export formats ──
+
+async function exportPDF(iconId) {
+  const svg = await getSVG(iconId);
+  // Minimal PDF with embedded SVG as image
+  const img = new Image();
+  const blob = await new Promise(resolve => {
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = 512; c.height = 512;
+      c.getContext('2d').drawImage(img, 0, 0, 512, 512);
+      const dataUrl = c.toDataURL('image/jpeg', 0.95);
+      const imgData = atob(dataUrl.split(',')[1]);
+      const imgBytes = new Uint8Array(imgData.length);
+      for (let i = 0; i < imgData.length; i++) imgBytes[i] = imgData.charCodeAt(i);
+      // Build minimal PDF
+      let pdf = '%PDF-1.4\n';
+      const objs = [];
+      const addObj = (s) => { objs.push(pdf.length); pdf += `${objs.length} 0 obj\n${s}\nendobj\n`; };
+      addObj('<< /Type /Catalog /Pages 2 0 R >>');
+      addObj(`<< /Type /Pages /Kids [3 0 R] /Count 1 >>`);
+      addObj(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 612] /Contents 4 0 R /Resources << /XObject << /Img 5 0 R >> >> >>`);
+      const stream = `q 512 0 0 512 50 50 cm /Img Do Q`;
+      addObj(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+      const imgStream = String.fromCharCode(...imgBytes);
+      addObj(`<< /Type /XObject /Subtype /Image /Width 512 /Height 512 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imgBytes.length} >>\nstream\n${imgStream}\nendstream`);
+      const xrefPos = pdf.length;
+      pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
+      objs.forEach(o => { pdf += String(o).padStart(10, '0') + ' 00000 n \n'; });
+      pdf += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF`;
+      resolve(new Blob([pdf], { type: 'application/pdf' }));
+    };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+  triggerDownload(blob, iconId.replace(':', '-') + '.pdf');
+}
+
+function exportVue(iconId) {
+  getSVG(iconId).then(svg => {
+    const name = iconId.split(':')[1].replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
+    const comp = `<template>\n  ${svg.replace(/width="[^"]*"/, ':width="size"').replace(/height="[^"]*"/, ':height="size"')}\n</template>\n\n<script>\nexport default {\n  name: '${name}Icon',\n  props: { size: { type: Number, default: 24 } }\n}\n</script>\n`;
+    triggerTextDownload(comp, name + 'Icon.vue', 'text/plain');
+  });
+}
+
+function exportSvelte(iconId) {
+  getSVG(iconId).then(svg => {
+    const name = iconId.split(':')[1].replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
+    const comp = `<script>\n  export let size = 24;\n</script>\n\n${svg.replace(/width="[^"]*"/, 'width={size}').replace(/height="[^"]*"/, 'height={size}')}\n`;
+    triggerTextDownload(comp, name + 'Icon.svelte', 'text/plain');
+  });
+}
+
+function exportSwift(iconId) {
+  getSVG(iconId).then(svg => {
+    const name = iconId.split(':')[1].replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
+    const b64 = btoa(unescape(encodeURIComponent(svg)));
+    const swift = `import SwiftUI\n\nstruct ${name}Icon: View {\n    var size: CGFloat = 24\n\n    var body: some View {\n        Image(uiImage: UIImage(data: Data(base64Encoded: "${b64}")!)!)\n            .resizable()\n            .frame(width: size, height: size)\n    }\n}\n`;
+    triggerTextDownload(swift, name + 'Icon.swift', 'text/plain');
+  });
+}
+
+function exportKotlin(iconId) {
+  getSVG(iconId).then(svg => {
+    const name = iconId.split(':')[1].replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
+    // Parse SVG paths for Android Vector Drawable
+    const viewBox = svg.match(/viewBox="([^"]+)"/) || ['', '0 0 24 24'];
+    const vb = viewBox[1].split(/\s+/);
+    const paths = [...svg.matchAll(/<path[^>]*d="([^"]+)"[^>]*/g)].map(m => m[1]);
+    const fills = [...svg.matchAll(/<path[^>]*fill="([^"]+)"[^>]*/g)].map(m => m[1]);
+    let xml = `<?xml version="1.0" encoding="utf-8"?>\n<vector xmlns:android="http://schemas.android.com/apk/res/android"\n    android:width="24dp"\n    android:height="24dp"\n    android:viewportWidth="${vb[2] || 24}"\n    android:viewportHeight="${vb[3] || 24}">\n`;
+    paths.forEach((d, i) => {
+      xml += `    <path\n        android:fillColor="${fills[i] || '#000000'}"\n        android:pathData="${d}" />\n`;
+    });
+    xml += `</vector>\n`;
+    triggerTextDownload(xml, name + '.xml', 'text/xml');
+  });
+}
+
+async function exportSpriteSheet(setId) {
+  let data = svgCache.get('__set_' + setId);
+  if (!data) {
+    data = await fetch(`https://api.iconify.design/${setId}.json`).then(r => r.json());
+    svgCache.set('__set_' + setId, data);
+  }
+  const icons = Object.keys(data.icons || {});
+  let symbols = '';
+  for (let i = 0; i < Math.min(icons.length, 200); i += 20) {
+    const batch = icons.slice(i, i + 20);
+    await Promise.all(batch.map(async (name) => {
+      try {
+        let svg = await fetch(`https://api.iconify.design/${setId}/${name}.svg`).then(r => r.text());
+        const vb = svg.match(/viewBox="([^"]+)"/) || ['', '0 0 24 24'];
+        const inner = svg.replace(/<svg[^>]*>/, '').replace(/<\/svg>/, '');
+        symbols += `  <symbol id="${name}" viewBox="${vb[1]}">${inner}</symbol>\n`;
+      } catch {}
+    }));
+  }
+  const sprite = `<svg xmlns="http://www.w3.org/2000/svg" style="display:none">\n${symbols}</svg>\n\n<!-- Usage: <svg><use href="#icon-name"/></svg> -->\n`;
+  triggerTextDownload(sprite, setId + '-sprite.svg', 'image/svg+xml');
+}
+
+async function exportLottie(iconId) {
+  const svg = await getSVG(iconId);
+  // Basic Lottie JSON with a static shape from SVG paths
+  const paths = [...svg.matchAll(/<path[^>]*d="([^"]+)"[^>]*/g)].map(m => m[1]);
+  const lottie = {
+    v: "5.7.1", fr: 30, ip: 0, op: 60, w: 24, h: 24,
+    layers: [{
+      ty: 4, nm: iconId, ip: 0, op: 60, st: 0,
+      ks: { o: { a: 0, k: 100 }, r: { a: 1, k: [{ t: 0, s: [0], e: [360] }, { t: 60 }] }, p: { a: 0, k: [12, 12] }, s: { a: 0, k: [100, 100] } },
+      shapes: paths.map(d => ({
+        ty: "sh", ks: { a: 0, k: { c: true, v: [[0,0]], i: [[0,0]], o: [[0,0]] } },
+        nm: "path"
+      }))
+    }]
+  };
+  triggerTextDownload(JSON.stringify(lottie, null, 2), iconId.replace(':', '-') + '.json', 'application/json');
 }
 
 let _exportMenu = null;
@@ -3176,8 +3327,16 @@ function showExportMenu(event, type, id) {
     html += `<div class="export-extra" style="display:none">`;
     html += `<button onclick="exportJPG('${id}');closeExportMenu()">JPG</button>`;
     html += `<button onclick="exportWebP('${id}');closeExportMenu()">WebP</button>`;
-    html += `<button onclick="exportBase64('${id}');closeExportMenu()">Base64 URI</button>`;
+    html += `<button onclick="exportPDF('${id}');closeExportMenu()">PDF</button>`;
+    html += `<button onclick="exportBase64('${id}');closeExportMenu()">Base64 Data URI</button>`;
+    html += `<button onclick="exportLottie('${id}');closeExportMenu()">Lottie JSON</button>`;
+    html += `<div class="export-divider"></div>`;
     html += `<button onclick="exportReact('${id}');closeExportMenu()">React Component</button>`;
+    html += `<button onclick="exportVue('${id}');closeExportMenu()">Vue Component</button>`;
+    html += `<button onclick="exportSvelte('${id}');closeExportMenu()">Svelte Component</button>`;
+    html += `<div class="export-divider"></div>`;
+    html += `<button onclick="exportSwift('${id}');closeExportMenu()">Swift (SwiftUI)</button>`;
+    html += `<button onclick="exportKotlin('${id}');closeExportMenu()">Kotlin (Vector Drawable)</button>`;
     html += `</div>`;
   } else if (isSet) {
     html += `<button onclick="exportSetZip('${id}','svg');closeExportMenu()">SVG (.zip)</button>`;
@@ -3188,7 +3347,13 @@ function showExportMenu(event, type, id) {
     html += `<div class="export-extra" style="display:none">`;
     html += `<button onclick="exportSetZip('${id}','jpg');closeExportMenu()">JPG (.zip)</button>`;
     html += `<button onclick="exportSetZip('${id}','webp');closeExportMenu()">WebP (.zip)</button>`;
-    html += `<button onclick="exportSetZip('${id}','react');closeExportMenu()">React Components (.zip)</button>`;
+    html += `<button onclick="exportSpriteSheet('${id}');closeExportMenu()">CSS Sprite Sheet</button>`;
+    html += `<div class="export-divider"></div>`;
+    html += `<button onclick="exportSetZip('${id}','react');closeExportMenu()">React (.zip)</button>`;
+    html += `<button onclick="exportSetZip('${id}','vue');closeExportMenu()">Vue (.zip)</button>`;
+    html += `<button onclick="exportSetZip('${id}','svelte');closeExportMenu()">Svelte (.zip)</button>`;
+    html += `<button onclick="exportSetZip('${id}','swift');closeExportMenu()">Swift (.zip)</button>`;
+    html += `<button onclick="exportSetZip('${id}','kotlin');closeExportMenu()">Kotlin (.zip)</button>`;
     html += `</div>`;
   } else if (isLoading) {
     html += `<button onclick="alert('Loading CSS export coming soon');closeExportMenu()">CSS</button>`;
