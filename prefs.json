@@ -1,16 +1,45 @@
 {
-  "scale": 58,
+  "scale": 64,
   "view": "grid",
-  "sortMode": "category",
+  "sortMode": "name",
   "activeFilter": null,
   "dark": false,
-  "liked": [],
-  "hidden": [],
+  "liked": [
+    "dashicons:open-folder",
+    "flat-color-icons:folder",
+    "arcticons:folder-media",
+    "material-symbols-light:folder-open-sharp",
+    "line-md:folder",
+    "material-symbols-light:folder-outline-sharp",
+    "circum:folder-on",
+    "healthicons:ui-folder",
+    "iconoir:folder-plus",
+    "iconamoon:folder-video-thin",
+    "lets-icons:folder-add-light",
+    "lets-icons:folder-up-light",
+    "ri:folder-video-fill"
+  ],
+  "hidden": [
+    "material-icon-theme:folder-helm",
+    "flat-color-icons:address-book"
+  ],
   "likedSets": [
     "lucide",
     "lucide-lab"
   ],
-  "hiddenSets": [],
+  "hiddenSets": [
+    "catppuccin",
+    "vscode-icons",
+    "streamline-plump-color",
+    "streamline-plump",
+    "material-icon-theme",
+    "streamline-freehand-color",
+    "streamline-freehand",
+    "streamline-flex-color",
+    "streamline-color",
+    "icon-park",
+    "academicons"
+  ],
   "likedLoadingItems": [],
   "hiddenLoadingItems": [
     "18:14"
@@ -19,9 +48,9 @@
   "hiddenLoadingCatsList": [
     11
   ],
-  "activeSet": "__all__",
+  "activeSet": null,
   "activeLoadingCat": null,
-  "animIdx": -1,
+  "animIdx": 0,
   "likedAnims": [],
   "hiddenAnims": [],
   "sidebarWidth": null
