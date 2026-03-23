@@ -2508,9 +2508,36 @@ function rateIcon(iconId, action) {
     else likedIcons.add(iconId);
   } else {
     if (likedIcons.has(iconId)) likedIcons.delete(iconId);
-    else { hiddenIcons.add(iconId); updateLikedPrefixes(); saveState(); navSingle(1); return; }
+    else {
+      hiddenIcons.add(iconId);
+      // In single/versions view, navigate to next
+      if (currentView === 'single' || currentView === 'versions') {
+        updateLikedPrefixes(); saveState(); navSingle(1); return;
+      }
+      // In grid view, just remove the element with animation
+      const el = document.querySelector(`.icon-cell[data-icon="${iconId}"]`);
+      if (el) {
+        const wrap = el.closest('.grid-item-wrap') || el;
+        wrap.style.transition = 'opacity 0.2s, transform 0.2s';
+        wrap.style.opacity = '0';
+        wrap.style.transform = 'scale(0.8)';
+        setTimeout(() => wrap.remove(), 200);
+      }
+      updateLikedPrefixes(); saveState(); return;
+    }
   }
   updateLikedPrefixes();
+  // In grid view, update the button visually without full re-render
+  if (currentView === 'grid') {
+    const el = document.querySelector(`.icon-cell[data-icon="${iconId}"]`);
+    if (el) {
+      const wrap = el.closest('.grid-item-wrap') || el;
+      const plusBtn = wrap.querySelector('.rate-btn.plus, button:last-child');
+      if (plusBtn) plusBtn.classList.toggle('liked', likedIcons.has(iconId));
+    }
+    saveState();
+    return;
+  }
   renderCanvas();
   saveState();
 }
