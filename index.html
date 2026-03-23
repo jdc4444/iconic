@@ -2955,12 +2955,12 @@ async function restoreState() {
 }
 
 // Track visible set in All mode — sync sidebar highlight with canvas scroll
-let _scrollTrackRAF = null;
+let _scrollTrackTimer = null;
+let _lastTrackedPrefix = '';
 document.getElementById('canvas').addEventListener('scroll', () => {
   if (!activeSets.has('__all__') && !searchFilter) return;
-  if (_scrollTrackRAF) return;
-  _scrollTrackRAF = requestAnimationFrame(() => {
-    _scrollTrackRAF = null;
+  clearTimeout(_scrollTrackTimer);
+  _scrollTrackTimer = setTimeout(() => {
     const canvas = document.getElementById('canvas');
     const sections = canvas.querySelectorAll('.set-section[data-prefix]');
     let topSection = null;
@@ -2971,6 +2971,8 @@ document.getElementById('canvas').addEventListener('scroll', () => {
     }
     if (!topSection) return;
     const prefix = topSection.dataset.prefix;
+    if (prefix === _lastTrackedPrefix) return;
+    _lastTrackedPrefix = prefix;
     const items = document.querySelectorAll('.set-item');
     let found = null;
     for (const item of items) {
@@ -2980,7 +2982,7 @@ document.getElementById('canvas').addEventListener('scroll', () => {
       if (isThis) found = item;
     }
     if (found) found.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  });
+  }, 100);
 });
 
 restoreState().then(() => { updateAnimUI(); loadCollections(); });
