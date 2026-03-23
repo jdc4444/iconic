@@ -2129,7 +2129,7 @@ async function renderCanvas() {
       // Update sidebar once at the end
       renderSidebar();
       applyAnim();
-      setupSectionObserver();
+      buildSectionOffsets();
       return;
     }
   } else if (activeSets.has('__all__')) {
@@ -2224,7 +2224,7 @@ async function renderCanvas() {
   if (currentView === 'single' || currentView === 'versions') { renderSingleView(canvas, displaySets); applyAnim(); return; }
   renderIconGrid(canvas, displaySets);
   applyAnim();
-  if (activeSets.has('__all__') || searchFilter) setupSectionObserver();
+  if (activeSets.has('__all__') || searchFilter) buildSectionOffsets();
 }
 
 const ALL_MODE_ICON_CAP = 16; // max icons per set in All mode grid
@@ -2956,42 +2956,43 @@ async function restoreState() {
   } catch {}
 }
 
-// Track visible set — IntersectionObserver syncs sidebar to canvas
-let _sectionObserver = null;
-let _visibleSections = new Set();
+// Track visible set — build offset map after render, use scrollTop to look up
+let _sectionOffsets = []; // [{prefix, top}] sorted by top
 let _lastHighlighted = '';
 
-function setupSectionObserver() {
-  if (_sectionObserver) _sectionObserver.disconnect();
-  _visibleSections.clear();
+function buildSectionOffsets() {
+  _sectionOffsets = [];
   const canvas = document.getElementById('canvas');
-  _sectionObserver = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-      const p = e.target.dataset.prefix;
-      if (!p) continue;
-      if (e.isIntersecting) _visibleSections.add(p);
-      else _visibleSections.delete(p);
-    }
-    // Find the topmost visible section
-    const sections = canvas.querySelectorAll('.set-section[data-prefix]');
-    let topPrefix = '';
-    for (const sec of sections) {
-      if (_visibleSections.has(sec.dataset.prefix)) { topPrefix = sec.dataset.prefix; break; }
-    }
-    if (!topPrefix || topPrefix === _lastHighlighted) return;
-    _lastHighlighted = topPrefix;
-    const items = document.querySelectorAll('.set-item');
-    let found = null;
-    for (const item of items) {
-      const onclick = item.getAttribute('onclick') || '';
-      const isThis = onclick.includes(`'${topPrefix}'`);
-      item.classList.toggle('active', isThis);
-      if (isThis) found = item;
-    }
-    if (found) found.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, { root: canvas, rootMargin: '0px', threshold: 0 });
-  canvas.querySelectorAll('.set-section[data-prefix]').forEach(sec => _sectionObserver.observe(sec));
+  const sections = canvas.querySelectorAll('.set-section[data-prefix]');
+  for (const sec of sections) {
+    _sectionOffsets.push({ prefix: sec.dataset.prefix, top: sec.offsetTop });
+  }
 }
+
+function highlightSidebarForScroll() {
+  const canvas = document.getElementById('canvas');
+  const scrollPos = canvas.scrollTop + 80;
+  let prefix = '';
+  for (let i = _sectionOffsets.length - 1; i >= 0; i--) {
+    if (_sectionOffsets[i].top <= scrollPos) { prefix = _sectionOffsets[i].prefix; break; }
+  }
+  if (!prefix || prefix === _lastHighlighted) return;
+  _lastHighlighted = prefix;
+  const items = document.querySelectorAll('.set-item');
+  let found = null;
+  for (const item of items) {
+    const onclick = item.getAttribute('onclick') || '';
+    const isThis = onclick.includes(`'${prefix}'`);
+    item.classList.toggle('active', isThis);
+    if (isThis) found = item;
+  }
+  if (found) found.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+document.getElementById('canvas').addEventListener('scroll', () => {
+  if (!activeSets.has('__all__') && !searchFilter) return;
+  highlightSidebarForScroll();
+}, { passive: true });
 
 restoreState().then(() => { updateAnimUI(); loadCollections(); });
 </script>
