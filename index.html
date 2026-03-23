@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Iconic</title>
 <script src="https://cdn.jsdelivr.net/npm/iconify-icon@3.0.2/dist/iconify-icon.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
 
@@ -346,6 +347,14 @@
   .set-section-title { font-size: 12px; font-weight: 600; }
   .set-section-count { font-size: 10px; color: var(--muted); }
   .set-section-author { font-size: 10px; color: var(--muted); margin-left: auto; }
+  .set-download { font-size: 10px; color: var(--muted); cursor: pointer; margin-left: 8px; padding: 2px 6px; border-radius: 3px; }
+  .set-download:hover { color: var(--fg); background: var(--hover); }
+
+  .export-menu { position: fixed; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 4px 0; z-index: 1000; box-shadow: 0 4px 16px rgba(0,0,0,0.15); min-width: 150px; font-size: 12px; }
+  .export-menu button { display: block; width: 100%; padding: 7px 14px; text-align: left; background: none; border: none; font-size: 12px; font-family: inherit; cursor: pointer; color: var(--fg); }
+  .export-menu button:hover { background: var(--hover); }
+  .export-menu .export-divider { height: 1px; background: var(--border); margin: 4px 0; }
+  .export-menu .export-more { color: var(--muted); font-size: 11px; }
 
   .icon-grid {
     display: flex;
@@ -2262,6 +2271,7 @@ function buildSetHtml(s, gridStyle, cellSize, cap = 0) {
       <div class="set-section-header" style="cursor:pointer" onclick="loadSet('${s.id}')">
         <span class="set-section-title">${s.name}</span>
         <span class="set-section-count">${items.length} loaders</span>
+        <span class="set-download" onclick="event.stopPropagation();showExportMenu(event,'loading','${s.id}')">Download</span>
       </div>
       <div class="icon-grid" style="${gridStyle}">${cappedItems.map((b, bi) => {
         const lid = `${s.loadingIdx}:${bi}`;
@@ -2284,6 +2294,7 @@ function buildSetHtml(s, gridStyle, cellSize, cap = 0) {
       <span class="set-section-title">${s.name}</span>
       <span class="set-section-count">${allNames.length.toLocaleString()} icons · ${s.license}</span>
       <span class="set-section-author">${s.author}</span>
+      <span class="set-download" onclick="event.stopPropagation();showExportMenu(event,'set','${s.id}')" onmouseenter="prefetchSet('${s.id}')">Download</span>
     </div>
     <div class="icon-grid" style="${gridStyle}">${icons.map(ic => {
       const iLiked = likedIcons.has(ic.icon);
@@ -2431,9 +2442,12 @@ function renderSingleView(canvas, active) {
   const rateHtml = `<button class="rate-btn minus" onclick="rateIcon('${c.icon}','minus')" title="${isLiked ? 'Remove from likes' : 'Hide from view'}">&minus;</button>
     <button class="rate-btn plus${isLiked ? ' liked' : ''}" onclick="rateIcon('${c.icon}','plus')" title="${isLiked ? 'Unlike' : 'Like'}">&plus;</button>`;
 
+  const dlBtn = `<span class="set-download" style="position:absolute;top:12px;right:16px;font-size:12px" onclick="showExportMenu(event,'icon','${c.icon}')" onmouseenter="prefetchIcon('${c.icon}')">Download</span>`;
+
   if (currentView === 'versions') {
     // Full versions view — all variants displayed larger
-    canvas.innerHTML = `<div class="single-view">
+    canvas.innerHTML = `<div class="single-view" style="position:relative">
+      ${dlBtn}
       <div class="single-set-name">${c.set}</div>
       <div class="single-icon-name" style="font-size:13px;font-weight:600;margin-bottom:8px">${baseName}</div>
       <div class="versions-grid" style="max-width:${Math.max(700, (currentScale + 40) * 5)}px">${variants.map((v, i) => {
@@ -2458,7 +2472,8 @@ function renderSingleView(canvas, active) {
     </div>`;
   }).join('')}</div>` : '';
 
-  canvas.innerHTML = `<div class="single-view">
+  canvas.innerHTML = `<div class="single-view" style="position:relative">
+    ${dlBtn}
     <div class="single-set-name">${c.set}</div>
     <div class="single-icon-display">
       <iconify-icon icon="${c.icon}" width="${sz}" height="${sz}"></iconify-icon>
@@ -2966,6 +2981,197 @@ async function restoreState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) applyState(JSON.parse(raw));
   } catch {}
+}
+
+// ── Export/Download System ──────────────────────────────────────
+const svgCache = new Map();
+
+function prefetchIcon(iconId) {
+  if (svgCache.has(iconId)) return;
+  const [prefix, name] = iconId.split(':');
+  fetch(`https://api.iconify.design/${prefix}/${name}.svg`).then(r => r.text()).then(svg => svgCache.set(iconId, svg)).catch(() => {});
+}
+
+function prefetchSet(setId) {
+  // Prefetch set JSON for zip export
+  if (svgCache.has('__set_' + setId)) return;
+  fetch(`https://api.iconify.design/${setId}.json`).then(r => r.json()).then(data => svgCache.set('__set_' + setId, data)).catch(() => {});
+}
+
+async function getSVG(iconId) {
+  if (svgCache.has(iconId)) return svgCache.get(iconId);
+  const [prefix, name] = iconId.split(':');
+  const svg = await fetch(`https://api.iconify.design/${prefix}/${name}.svg`).then(r => r.text());
+  svgCache.set(iconId, svg);
+  return svg;
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function triggerTextDownload(text, filename, mime = 'text/plain') {
+  triggerDownload(new Blob([text], { type: mime }), filename);
+}
+
+async function exportSVG(iconId) {
+  const svg = await getSVG(iconId);
+  triggerTextDownload(svg, iconId.replace(':', '-') + '.svg', 'image/svg+xml');
+}
+
+async function exportPNG(iconId, scale = 256) {
+  const svg = await getSVG(iconId);
+  const img = new Image();
+  const blob = await new Promise((resolve) => {
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = scale; c.height = scale;
+      c.getContext('2d').drawImage(img, 0, 0, scale, scale);
+      c.toBlob(resolve, 'image/png');
+    };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+  triggerDownload(blob, iconId.replace(':', '-') + '.png');
+}
+
+async function exportJPG(iconId, scale = 256) {
+  const svg = await getSVG(iconId);
+  const img = new Image();
+  const blob = await new Promise((resolve) => {
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = scale; c.height = scale;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, scale, scale);
+      ctx.drawImage(img, 0, 0, scale, scale);
+      c.toBlob(resolve, 'image/jpeg', 0.92);
+    };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+  triggerDownload(blob, iconId.replace(':', '-') + '.jpg');
+}
+
+async function exportWebP(iconId, scale = 256) {
+  const svg = await getSVG(iconId);
+  const img = new Image();
+  const blob = await new Promise((resolve) => {
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = scale; c.height = scale;
+      c.getContext('2d').drawImage(img, 0, 0, scale, scale);
+      c.toBlob(resolve, 'image/webp', 0.92);
+    };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+  triggerDownload(blob, iconId.replace(':', '-') + '.webp');
+}
+
+async function exportCSS(iconId) {
+  const svg = await getSVG(iconId);
+  const b64 = btoa(unescape(encodeURIComponent(svg)));
+  const css = `.icon-${iconId.replace(':', '-')} {\n  display: inline-block;\n  width: 24px;\n  height: 24px;\n  background: url("data:image/svg+xml;base64,${b64}") no-repeat center/contain;\n}\n`;
+  triggerTextDownload(css, iconId.replace(':', '-') + '.css', 'text/css');
+}
+
+async function exportBase64(iconId) {
+  const svg = await getSVG(iconId);
+  const uri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+  triggerTextDownload(uri, iconId.replace(':', '-') + '-base64.txt');
+}
+
+async function exportReact(iconId) {
+  const svg = await getSVG(iconId);
+  const name = iconId.split(':')[1].replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
+  const jsxSvg = svg.replace(/class=/g, 'className=').replace(/clip-path/g, 'clipPath').replace(/fill-rule/g, 'fillRule').replace(/stroke-width/g, 'strokeWidth').replace(/stroke-linecap/g, 'strokeLinecap').replace(/stroke-linejoin/g, 'strokeLinejoin');
+  const component = `import React from 'react';\n\nexport function ${name}Icon({ size = 24, ...props }) {\n  return (\n    ${jsxSvg.replace(/width="[^"]*"/, `width={size}`).replace(/height="[^"]*"/, `height={size}`)}\n  );\n}\n`;
+  triggerTextDownload(component, name + 'Icon.jsx', 'text/javascript');
+}
+
+async function exportSetZip(setId) {
+  if (typeof JSZip === 'undefined') { alert('JSZip not loaded'); return; }
+  const zip = new JSZip();
+  // Fetch full set data
+  let data = svgCache.get('__set_' + setId);
+  if (!data) {
+    data = await fetch(`https://api.iconify.design/${setId}.json`).then(r => r.json());
+    svgCache.set('__set_' + setId, data);
+  }
+  const icons = Object.keys(data.icons || {});
+  const folder = zip.folder(setId);
+  // Fetch SVGs in parallel batches of 20
+  for (let i = 0; i < icons.length; i += 20) {
+    const batch = icons.slice(i, i + 20);
+    await Promise.all(batch.map(async (name) => {
+      try {
+        const svg = await fetch(`https://api.iconify.design/${setId}/${name}.svg`).then(r => r.text());
+        folder.file(name + '.svg', svg);
+      } catch {}
+    }));
+  }
+  const blob = await zip.generateAsync({ type: 'blob' });
+  triggerDownload(blob, setId + '-icons.zip');
+}
+
+let _exportMenu = null;
+
+function showExportMenu(event, type, id) {
+  event.stopPropagation();
+  closeExportMenu();
+  const menu = document.createElement('div');
+  menu.className = 'export-menu';
+  const isSet = type === 'set';
+  const isLoading = type === 'loading';
+  const isIcon = type === 'icon';
+
+  let html = '';
+  if (isIcon) {
+    html += `<button onclick="exportSVG('${id}');closeExportMenu()">SVG</button>`;
+    html += `<button onclick="exportCSS('${id}');closeExportMenu()">CSS</button>`;
+    html += `<button onclick="exportPNG('${id}');closeExportMenu()">PNG</button>`;
+    html += `<div class="export-divider"></div>`;
+    html += `<button class="export-more" onclick="this.parentElement.querySelector('.export-extra').style.display='block';this.style.display='none'">+ More formats</button>`;
+    html += `<div class="export-extra" style="display:none">`;
+    html += `<button onclick="exportJPG('${id}');closeExportMenu()">JPG</button>`;
+    html += `<button onclick="exportWebP('${id}');closeExportMenu()">WebP</button>`;
+    html += `<button onclick="exportBase64('${id}');closeExportMenu()">Base64 URI</button>`;
+    html += `<button onclick="exportReact('${id}');closeExportMenu()">React Component</button>`;
+    html += `</div>`;
+  } else if (isSet) {
+    html += `<button onclick="exportSetZip('${id}');closeExportMenu()">Download All SVGs (.zip)</button>`;
+    html += `<button onclick="exportSVG('${id}:' + (iconCache['${id}'] || [])[0]);closeExportMenu()">SVG (first icon)</button>`;
+    html += `<button onclick="exportPNG('${id}:' + (iconCache['${id}'] || [])[0]);closeExportMenu()">PNG (first icon)</button>`;
+  } else if (isLoading) {
+    html += `<button onclick="alert('Loading CSS export coming soon');closeExportMenu()">CSS</button>`;
+    html += `<button onclick="alert('Loading PNG export coming soon');closeExportMenu()">PNG</button>`;
+  }
+
+  menu.innerHTML = html;
+  // Position near click
+  const x = Math.min(event.clientX, window.innerWidth - 170);
+  const y = Math.min(event.clientY, window.innerHeight - 200);
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  document.body.appendChild(menu);
+  _exportMenu = menu;
+  // Close on click outside or Escape
+  setTimeout(() => {
+    document.addEventListener('click', _closeExportHandler);
+    document.addEventListener('keydown', _closeExportEsc);
+  }, 10);
+}
+
+function _closeExportHandler(e) { if (_exportMenu && !_exportMenu.contains(e.target)) closeExportMenu(); }
+function _closeExportEsc(e) { if (e.key === 'Escape') closeExportMenu(); }
+
+function closeExportMenu() {
+  if (_exportMenu) { _exportMenu.remove(); _exportMenu = null; }
+  document.removeEventListener('click', _closeExportHandler);
+  document.removeEventListener('keydown', _closeExportEsc);
 }
 
 // Track visible set — live offsetTop check on scroll
