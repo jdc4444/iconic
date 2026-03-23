@@ -2978,7 +2978,7 @@ function highlightSidebarForPrefix(prefix) {
     item.classList.toggle('active', isThis);
     if (isThis) found = item;
   }
-  if (found) found.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  if (found) found.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
 // Track mouse position over canvas — highlight sidebar based on hovered section
