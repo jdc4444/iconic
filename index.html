@@ -2962,25 +2962,18 @@ async function restoreState() {
   } catch {}
 }
 
-// Track visible set — build offset map after render, use scrollTop to look up
-let _sectionOffsets = []; // [{prefix, top}] sorted by top
+// Track visible set — live offsetTop check on scroll
 let _lastHighlighted = '';
 
-function buildSectionOffsets() {
-  _sectionOffsets = [];
-  const canvas = document.getElementById('canvas');
-  const sections = canvas.querySelectorAll('.set-section[data-prefix]');
-  for (const sec of sections) {
-    _sectionOffsets.push({ prefix: sec.dataset.prefix, top: sec.offsetTop });
-  }
-}
+function buildSectionOffsets() {} // no-op, kept for compat
 
 function highlightSidebarForScroll() {
   const canvas = document.getElementById('canvas');
   const scrollPos = canvas.scrollTop + 80;
+  const sections = canvas.querySelectorAll('.set-section[data-prefix]');
   let prefix = '';
-  for (let i = _sectionOffsets.length - 1; i >= 0; i--) {
-    if (_sectionOffsets[i].top <= scrollPos) { prefix = _sectionOffsets[i].prefix; break; }
+  for (let i = sections.length - 1; i >= 0; i--) {
+    if (sections[i].offsetTop <= scrollPos) { prefix = sections[i].dataset.prefix; break; }
   }
   if (!prefix || prefix === _lastHighlighted) return;
   _lastHighlighted = prefix;
