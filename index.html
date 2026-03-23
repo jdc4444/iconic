@@ -2321,6 +2321,8 @@ function renderIconGrid(canvas, sets) {
             rebindIconClicks(el);
           }
           lazyObserver.unobserve(el);
+          // Rebuild offsets as sections change height
+          buildSectionOffsets();
         }
       });
     }, { rootMargin: '600px' });
@@ -2328,10 +2330,14 @@ function renderIconGrid(canvas, sets) {
     for (let i = 0; i < sets.length; i++) {
       const placeholder = document.createElement('div');
       placeholder.dataset.lazyIdx = i;
+      placeholder.dataset.prefix = sets[i].prefix || sets[i].id || '';
+      placeholder.className = 'set-section';
       placeholder.style.minHeight = '80px'; // reserve space
       canvas.appendChild(placeholder);
       lazyObserver.observe(placeholder);
     }
+    // Build offsets after placeholders are in DOM
+    requestAnimationFrame(() => buildSectionOffsets());
     return;
   }
 
