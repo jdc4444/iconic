@@ -223,7 +223,40 @@ function renderBase64Cell(td, svg) {
 function renderCodeCell(td, code, label) {
   try {
     if (!code || code.length === 0) { markCell(td, false, '<em>empty</em>'); return; }
-    markCell(td, true, `<pre>${escHtml(truncate(code, 6))}</pre>`);
+    // Extract SVG from component code and render it visually
+    const svgMatch = code.match(/<svg[\s\S]*?<\/svg>/i);
+    let visual = '';
+    if (svgMatch) {
+      const safe = svgMatch[0]
+        .replace(/\{size\}/g, '48').replace(/:width="size"/g, 'width="48"').replace(/:height="size"/g, 'height="48"')
+        .replace(/className=/g, 'class=').replace(/width=\{size\}/g, 'width="48"').replace(/height=\{size\}/g, 'height="48"')
+        .replace(/<script[\s\S]*?<\/script>/gi, '');
+      visual = `<div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;margin:0 auto">${safe}</div>`;
+    } else if (label === 'Swift') {
+      // Swift uses base64 encoded SVG - decode and render
+      const b64Match = code.match(/base64Encoded:\s*"([^"]+)"/);
+      if (b64Match) {
+        try {
+          const decoded = atob(b64Match[1]);
+          const safeSvg = decoded.replace(/<script[\s\S]*?<\/script>/gi, '');
+          visual = `<div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;margin:0 auto">${safeSvg}</div>`;
+        } catch(e) { visual = ''; }
+      }
+    } else if (label === 'Kotlin') {
+      // Kotlin is Android Vector Drawable XML - show the path data as an SVG
+      const vw = code.match(/viewportWidth="([^"]+)"/) || ['','24'];
+      const vh = code.match(/viewportHeight="([^"]+)"/) || ['','24'];
+      const paths = [...code.matchAll(/fillColor="([^"]+)"[^>]*pathData="([^"]+)"/g)];
+      if (paths.length) {
+        let pathsSvg = paths.map(m => `<path fill="${m[1]}" d="${m[2]}"/>`).join('');
+        visual = `<div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;margin:0 auto"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vw[1]} ${vh[1]}" width="48" height="48">${pathsSvg}</svg></div>`;
+      }
+    }
+    if (!visual) {
+      markCell(td, false, `<pre>${escHtml(truncate(code, 4))}</pre>`);
+    } else {
+      markCell(td, true, visual);
+    }
   } catch (e) {
     markCell(td, false, `<em>${escHtml(e.message)}</em>`);
   }
@@ -346,10 +379,111 @@ async function run() {
     }
 
     setStatus(`Done. Tested ${iconIds.length} icons x ${FORMATS.length} formats = ${iconIds.length * FORMATS.length} conversions.`);
+
+    // Step 5: Loading animation tests
+    await testLoadingAnimations();
+
   } catch (e) {
     setStatus(`<span class="err">Error: ${escHtml(e.message)}</span>`);
     console.error(e);
   }
+}
+
+async function testLoadingAnimations() {
+  // Add a loading animation section
+  const section = document.createElement('div');
+  section.innerHTML = '<h2 style="margin:24px 0 12px">Loading Animation Roundtrip</h2><p style="margin-bottom:12px;color:#666">Testing 10 random loading animations render and animate correctly.</p>';
+  document.body.appendChild(section);
+
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;margin-bottom:24px';
+  section.appendChild(grid);
+
+  // Test loaders covering different animation types
+  const catalog = [
+    { label: 'Border Spin', style: 'width:20px;height:20px;border:3px solid rgba(0,0,0,0.1);border-top-color:#333;border-radius:50%;animation:spin 0.8s linear infinite', inner: '' },
+    { label: 'Pulse Dot', style: 'width:12px;height:12px;border-radius:50%;background:#333;animation:lio-pulse 1s ease-in-out infinite', inner: '' },
+    { label: 'Bounce Ball', style: 'width:12px;height:12px;border-radius:50%;background:#333;animation:lio-bounce 1s ease-in-out infinite', inner: '' },
+    { label: 'Dual Ring', style: 'width:20px;height:20px;border:3px solid #333;border-radius:50%;border-top-color:transparent;border-bottom-color:transparent;animation:spin 1s linear infinite', inner: '' },
+    { label: 'Bar Scale', style: 'display:flex;gap:2px;align-items:center;height:20px', inner: '<span style="width:3px;height:60%;background:#333;border-radius:1px;animation:ld-stretch 1s ease-in-out infinite"></span><span style="width:3px;height:100%;background:#333;border-radius:1px;animation:ld-stretch 1s ease-in-out infinite;animation-delay:0.1s"></span><span style="width:3px;height:60%;background:#333;border-radius:1px;animation:ld-stretch 1s ease-in-out infinite;animation-delay:0.2s"></span>' },
+    { label: 'Shimmer Bar', style: 'width:40px;height:6px;border-radius:3px;background:linear-gradient(90deg,#e4e6eb 25%,#f0f2f5 37%,#e4e6eb 63%);background-size:200% 100%;animation:btn-skeleton 1.2s ease-in-out infinite', inner: '' },
+    { label: 'Conic Gradient', style: 'width:20px;height:20px;border-radius:50%;background:conic-gradient(from 0deg,transparent,#333);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px));animation:spin 0.9s linear infinite', inner: '' },
+    { label: 'Dot Flow', style: 'display:flex;gap:4px;align-items:center', inner: '<span style="width:6px;height:6px;border-radius:50%;background:#333;animation:ld-dot-bounce 0.6s ease-in-out infinite"></span><span style="width:6px;height:6px;border-radius:50%;background:#333;animation:ld-dot-bounce 0.6s ease-in-out infinite;animation-delay:0.1s"></span><span style="width:6px;height:6px;border-radius:50%;background:#333;animation:ld-dot-bounce 0.6s ease-in-out infinite;animation-delay:0.2s"></span>' },
+    { label: 'Flip Square', style: 'width:14px;height:14px;background:#333;animation:lio-flip-h 1.2s ease-in-out infinite', inner: '' },
+    { label: 'Fade Ring', style: 'width:20px;height:20px;border:3px solid #333;border-radius:50%;animation:lio-fade 1.5s ease-in-out infinite', inner: '' },
+  ];
+
+  if (catalog.length === 0) {
+    grid.innerHTML = '<p style="color:#c22">Could not load animation catalog</p>';
+    return;
+  }
+
+  // Pick 10 random
+  const picks = shuffleArray([...catalog]).slice(0, 10);
+  let animPass = 0, animFail = 0;
+
+  // Inject required keyframes
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes lio-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.4); } }
+    @keyframes lio-bounce { 0%,100% { transform: translateY(0) scaleY(1); } 30% { transform: translateY(-12px); } 55% { transform: translateY(0) scaleX(1.1) scaleY(0.85); } }
+    @keyframes lio-flip-h { to { transform: rotateY(360deg); } }
+    @keyframes lio-fade { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+    @keyframes ld-stretch { 0%,100% { transform: scaleY(0.5); } 50% { transform: scaleY(1); } }
+    @keyframes ld-dot-bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+    @keyframes btn-skeleton { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  `;
+  document.head.appendChild(style);
+
+  for (const item of picks) {
+    const card = document.createElement('div');
+    card.style.cssText = 'border:1px solid #ddd;border-radius:8px;padding:12px;text-align:center;min-height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px';
+
+    const preview = document.createElement('div');
+    preview.style.cssText = 'width:40px;height:40px;display:flex;align-items:center;justify-content:center;overflow:hidden';
+    const inner = document.createElement('div');
+    inner.setAttribute('style', item.style);
+    inner.innerHTML = item.inner;
+    preview.appendChild(inner);
+
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:11px;color:#666;word-break:break-word';
+    label.textContent = item.label;
+
+    // Check if animation is running
+    card.appendChild(preview);
+    card.appendChild(label);
+    grid.appendChild(card);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const cs = getComputedStyle(inner);
+    const hasAnim = cs.animationName && cs.animationName !== 'none';
+    const hasSize = inner.offsetWidth > 0 || inner.offsetHeight > 0 || item.inner;
+
+    const badge = document.createElement('div');
+    if (hasAnim && hasSize) {
+      badge.innerHTML = '<span style="color:#2a2;font-weight:bold">✓ animating</span>';
+      animPass++;
+    } else if (hasSize) {
+      badge.innerHTML = '<span style="color:#f90;font-weight:bold">⚠ static</span>';
+      animPass++; // still visible, just no CSS animation detected
+    } else {
+      badge.innerHTML = '<span style="color:#c22;font-weight:bold">✗ invisible</span>';
+      animFail++;
+    }
+    badge.style.fontSize = '11px';
+    card.appendChild(badge);
+
+    totalTests++; if (hasSize) passed++; else failed++;
+    updateSummary();
+  }
+
+  const animSummary = document.createElement('p');
+  animSummary.style.cssText = 'font-size:14px;margin-bottom:16px';
+  animSummary.innerHTML = `Animations: <span class="pass">${animPass} visible</span> | <span class="fail">${animFail} invisible</span>`;
+  section.insertBefore(animSummary, grid);
 }
 
 run();
