@@ -1003,7 +1003,8 @@
 <div class="app">
   <div class="sidebar">
     <div class="sidebar-header">
-      <span style="font-weight:700;font-size:22px;letter-spacing:-0.6px">Iconic</span>
+      <span style="font-weight:700;font-size:66px;letter-spacing:-2px;line-height:1">Iconic</span>
+      <iconify-icon id="titleIcon" width="48" height="48" style="color:#e74c3c;margin-left:8px;transition:color 0.4s,transform 0.3s;transform:rotate(0deg)"></iconify-icon>
     </div>
     <div class="sidebar-sort" id="sidebarControls"></div>
     <div class="set-list" id="setList"></div>
@@ -3434,6 +3435,74 @@ document.getElementById('canvas').addEventListener('mousemove', (e) => {
 }, { passive: true });
 
 restoreState().then(() => { updateAnimUI(); loadCollections(); });
+
+// Title icon cycler — shuffled, never repeating until all exhausted
+(function titleIconCycler() {
+  const COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c','#3498db','#9b59b6','#e84393','#00cec9','#6c5ce7','#fd79a8','#00b894'];
+  let pool = [];
+  let monoSets = [];
+  let poolIdx = 0;
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  async function fillPool() {
+    if (!monoSets.length) {
+      monoSets = SETS.filter(s => !s.palette && !s.animated).map(s => s.prefix);
+      if (!monoSets.length) monoSets = SETS.map(s => s.prefix);
+    }
+    // Pick 20 random sets, fetch their icons
+    const picks = shuffle([...monoSets]).slice(0, 20);
+    const fetches = picks.map(async p => {
+      if (iconCache[p]) return iconCache[p].map(n => p + ':' + n);
+      try {
+        const r = await fetch('https://api.iconify.design/collection?prefix=' + p);
+        const d = await r.json();
+        const names = d.uncategorized || Object.values(d.categories || {}).flat() || [];
+        if (names.length) iconCache[p] = names;
+        return names.map(n => p + ':' + n);
+      } catch { return []; }
+    });
+    const results = await Promise.all(fetches);
+    pool = shuffle(results.flat());
+    poolIdx = 0;
+  }
+
+  function nextIcon() {
+    if (poolIdx >= pool.length) { fillPool().then(cycle); return; }
+    const icon = pool[poolIdx++];
+    const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+    const el = document.getElementById('titleIcon');
+    if (!el) return;
+    el.style.transform = 'rotate(20deg) scale(0.8)';
+    el.style.opacity = '0.3';
+    setTimeout(() => {
+      el.setAttribute('icon', icon);
+      el.style.color = color;
+      el.style.transform = 'rotate(0deg) scale(1)';
+      el.style.opacity = '1';
+    }, 200);
+  }
+
+  function cycle() { nextIcon(); setTimeout(cycle, 2000); }
+
+  // Start after collections load
+  const origLoad = window.loadCollections;
+  const _origLoadCollections = loadCollections;
+  window._titleCyclerStarted = false;
+  const _checkStart = setInterval(() => {
+    if (SETS.length > 0 && !window._titleCyclerStarted) {
+      window._titleCyclerStarted = true;
+      clearInterval(_checkStart);
+      fillPool().then(cycle);
+    }
+  }, 1000);
+})();
 </script>
 </body>
 </html>
