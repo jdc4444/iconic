@@ -1338,7 +1338,8 @@ function hoverSet(id) {
 
 async function loadSet(id) {
   clearTimeout(_hoverDebounce);
-  if (activeSets.size === 1 && activeSets.has(id)) return; // already active
+  // Clicking already-selected set returns to All view
+  if (activeSets.size === 1 && activeSets.has(id)) { toggleShowAll(); return; }
   // Save scroll position when leaving All mode
   if (showAll) _allScrollPos = document.getElementById('canvas').scrollTop;
   showAll = false;
