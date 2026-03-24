@@ -2243,13 +2243,7 @@ async function renderCanvas() {
   if (activeSets.has('__all__') || searchFilter) buildSectionOffsets();
 }
 
-function getAllModeCap() {
-  const canvas = document.getElementById('canvas');
-  if (!canvas) return 30;
-  const cellSize = Math.max(currentScale + 8, 28);
-  const perRow = Math.max(Math.floor(canvas.clientWidth / (cellSize + 1)), 1);
-  return perRow * 2; // always fill 2 rows
-}
+const ALL_MODE_ICON_CAP = 16; // max icons per set in All mode grid
 
 function buildSetHtml(s, gridStyle, cellSize, cap = 0) {
   const allNames = getIcons(s);
@@ -2322,7 +2316,7 @@ function renderIconGrid(canvas, sets) {
   const cellSize = Math.max(currentScale + Math.max(12, Math.round(currentScale * 0.15)), 28);
   const isAllOrSearch = activeSets.has('__all__') || !!searchFilter;
   const gridStyle = '';
-  const cap = (activeSets.has('__all__') && !searchFilter) ? getAllModeCap() : 0;
+  const cap = (activeSets.has('__all__') && !searchFilter) ? ALL_MODE_ICON_CAP : 0;
 
   allVisibleIcons = [];
 
@@ -2382,7 +2376,7 @@ function appendSetToCanvas(canvas, s) {
   const cellSize = Math.max(currentScale + Math.max(12, Math.round(currentScale * 0.15)), 28);
   const gridStyle = '';
   const isAllOrSearch = activeSets.has('__all__') || !!searchFilter;
-  const cap = (activeSets.has('__all__') && !searchFilter) ? getAllModeCap() : 0;
+  const cap = (activeSets.has('__all__') && !searchFilter) ? ALL_MODE_ICON_CAP : 0;
   const { html, icons } = buildSetHtml(s, gridStyle, cellSize, cap);
   if (!html) return;
   icons.forEach(ic => allVisibleIcons.push(ic));
@@ -3187,10 +3181,10 @@ async function exportSetZip(setId, format = 'svg') {
 // ── Format converters for zip export ──
 function svgToVue(svg, name) {
   const comp = name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
-  return `<template>\n  ${svg.replace(/width="[^"]*"/, ':width="size"').replace(/height="[^"]*"/, ':height="size"')}\n</template>\n\n<` + `script>\nexport default {\n  name: '${comp}Icon',\n  props: { size: { type: Number, default: 24 } }\n}\n</` + `script>\n`;
+  return `<template>\n  ${svg.replace(/width="[^"]*"/, ':width="size"').replace(/height="[^"]*"/, ':height="size"')}\n</template>\n\n<script>\nexport default {\n  name: '${comp}Icon',\n  props: { size: { type: Number, default: 24 } }\n}\n<\/script>\n`;
 }
 function svgToSvelte(svg, name) {
-  return `<` + `script>\n  export let size = 24;\n</` + `script>\n\n${svg.replace(/width="[^"]*"/, 'width={size}').replace(/height="[^"]*"/, 'height={size}')}\n`;
+  return `<script>\n  export let size = 24;\n<\/script>\n\n${svg.replace(/width="[^"]*"/, 'width={size}').replace(/height="[^"]*"/, 'height={size}')}\n`;
 }
 function svgToSwift(svg, name) {
   const comp = name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
@@ -3246,7 +3240,7 @@ async function exportPDF(iconId) {
 function exportVue(iconId) {
   getSVG(iconId).then(svg => {
     const name = iconId.split(':')[1].replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
-    const comp = svgToVue(svg, name);
+    const comp = `<template>\n  ${svg.replace(/width="[^"]*"/, ':width="size"').replace(/height="[^"]*"/, ':height="size"')}\n</template>\n\n<script>\nexport default {\n  name: '${name}Icon',\n  props: { size: { type: Number, default: 24 } }\n}\n<\/script>\n`;
     triggerTextDownload(comp, name + 'Icon.vue', 'text/plain');
   });
 }
@@ -3254,7 +3248,7 @@ function exportVue(iconId) {
 function exportSvelte(iconId) {
   getSVG(iconId).then(svg => {
     const name = iconId.split(':')[1].replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
-    const comp = svgToSvelte(svg, name);
+    const comp = `<script>\n  export let size = 24;\n<\/script>\n\n${svg.replace(/width="[^"]*"/, 'width={size}').replace(/height="[^"]*"/, 'height={size}')}\n`;
     triggerTextDownload(comp, name + 'Icon.svelte', 'text/plain');
   });
 }
