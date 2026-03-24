@@ -3097,11 +3097,26 @@ async function svgToBlob(svg, format, scale = 256) {
   const img = new Image();
   return new Promise((resolve) => {
     img.onload = () => {
+      // Preserve aspect ratio from SVG viewBox or width/height
+      const vb = svg.match(/viewBox="([^"]+)"/);
+      const wAttr = svg.match(/width="(\d+)/);
+      const hAttr = svg.match(/height="(\d+)/);
+      let svgW = 24, svgH = 24;
+      if (vb) {
+        const parts = vb[1].trim().split(/[\s,]+/);
+        svgW = parseFloat(parts[2]) || 24;
+        svgH = parseFloat(parts[3]) || 24;
+      } else if (wAttr && hAttr) {
+        svgW = parseInt(wAttr[1]); svgH = parseInt(hAttr[1]);
+      }
+      const aspect = svgW / svgH;
+      const cw = aspect >= 1 ? scale : Math.round(scale * aspect);
+      const ch = aspect >= 1 ? Math.round(scale / aspect) : scale;
       const c = document.createElement('canvas');
-      c.width = scale; c.height = scale;
+      c.width = cw; c.height = ch;
       const ctx = c.getContext('2d');
-      if (format === 'jpg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, scale, scale); }
-      ctx.drawImage(img, 0, 0, scale, scale);
+      if (format === 'jpg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch); }
+      ctx.drawImage(img, 0, 0, cw, ch);
       const mime = format === 'jpg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
       c.toBlob(resolve, mime, 0.92);
     };
