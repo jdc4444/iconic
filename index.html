@@ -302,6 +302,29 @@
     border-color: var(--fg);
   }
 
+  .cassette { display: flex; align-items: center; gap: 0; }
+  .cassette button:not(.cassette-aux) {
+    width: 28px; height: 28px; padding: 0; font-size: 13px;
+    font-family: inherit; font-weight: 500;
+    background: var(--bg); border: 1px solid var(--border);
+    border-right: none; cursor: pointer; color: var(--fg);
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.1s;
+  }
+  .cassette button:not(.cassette-aux):first-child { border-radius: 2px 0 0 2px; }
+  .cassette button:not(.cassette-aux):nth-child(3) { border-radius: 0 2px 2px 0; border-right: 1px solid var(--border); }
+  .cassette button:not(.cassette-aux):hover { background: var(--hover); }
+  .cassette button:not(.cassette-aux).active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .cassette-aux {
+    width: 20px; height: 20px; padding: 0; font-size: 10px;
+    font-family: inherit; font-weight: 600;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 2px; cursor: pointer; color: var(--fg);
+    display: flex; align-items: center; justify-content: center;
+    margin-left: 2px; transition: background 0.1s;
+  }
+  .cassette-aux:hover { background: var(--hover); }
+
   .view-toggle { display: flex; gap: 0; }
 
   .view-toggle button {
@@ -1030,13 +1053,11 @@
         <button onclick="setScale(96)">96</button>
         <button onclick="setScale(256)">256</button>
       </div>
-      <div class="view-toggle" id="animToggle" style="margin-left:8px;gap:0">
-        <button onclick="animPrev()" title="Previous animation" style="border-radius:3px 0 0 3px">‹</button>
-        <button class="active" id="animPause" onclick="animTogglePause()" title="Pause/Stop" style="border-radius:0;border-left:none;border-right:none">⏸</button>
-        <button id="animRight" onclick="animNext()" title="Play / Next animation" style="border-radius:0 3px 3px 0">›</button>
+      <div class="cassette" id="animToggle" style="margin-left:8px">
+        <button onclick="animPrev()" title="Previous animation">‹</button><button class="active" id="animPause" onclick="animTogglePause()" title="Pause/Stop">⏸</button><button id="animRight" onclick="animNext()" title="Play / Next">›</button>
         <span id="animLabel" style="font-size:9px;color:var(--muted);min-width:40px;text-align:center;padding:0 4px;align-self:center"></span>
-        <button id="animLike" onclick="toggleAnimLike()" title="Like animation" style="font-size:9px;padding:1px 4px;margin-left:2px;border-radius:3px;border:1px solid var(--border);background:var(--bg);cursor:pointer;display:none">+</button>
-        <button id="animHide" onclick="toggleAnimHide()" title="Hide animation" style="font-size:9px;padding:1px 4px;border-radius:3px;border:1px solid var(--border);background:var(--bg);cursor:pointer;display:none">−</button>
+        <button id="animLike" onclick="toggleAnimLike()" title="Like animation" class="cassette-aux" style="display:none">+</button>
+        <button id="animHide" onclick="toggleAnimHide()" title="Hide animation" class="cassette-aux" style="display:none">−</button>
       </div>
       <div style="margin-left:auto"></div>
       <div class="view-toggle">
