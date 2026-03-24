@@ -2271,8 +2271,8 @@ function buildSetHtml(s, gridStyle, cellSize, cap = 0) {
     const html = `<div class="set-section" data-prefix="${s.prefix}">
       <div class="set-section-header" style="cursor:pointer" onclick="loadSet('${s.id}')">
         <span class="set-section-title">${s.name}</span>
-        <span class="set-section-count">${items.length} loaders</span>
         <span class="set-download" onclick="event.stopPropagation();showExportMenu(event,'loading','${s.id}')">Download</span>
+        <span class="set-section-count">${items.length} loaders</span>
       </div>
       <div class="icon-grid" style="${gridStyle}">${cappedItems.map((b, bi) => {
         const lid = `${s.loadingIdx}:${bi}`;
@@ -2293,9 +2293,9 @@ function buildSetHtml(s, gridStyle, cellSize, cap = 0) {
   const html = `<div class="set-section" data-prefix="${s.prefix}">
     <div class="set-section-header" style="cursor:pointer" onclick="loadSet('${s.id}')">
       <span class="set-section-title">${s.name}</span>
+      <span class="set-download" onclick="event.stopPropagation();showExportMenu(event,'set','${s.id}')" onmouseenter="prefetchSet('${s.id}')">Download</span>
       <span class="set-section-count">${allNames.length.toLocaleString()} icons · ${s.license}</span>
       <span class="set-section-author">${s.author}</span>
-      <span class="set-download" onclick="event.stopPropagation();showExportMenu(event,'set','${s.id}')" onmouseenter="prefetchSet('${s.id}')">Download</span>
     </div>
     <div class="icon-grid" style="${gridStyle}">${icons.map(ic => {
       const iLiked = likedIcons.has(ic.icon);
@@ -2443,14 +2443,13 @@ function renderSingleView(canvas, active) {
   const rateHtml = `<button class="rate-btn minus" onclick="rateIcon('${c.icon}','minus')" title="${isLiked ? 'Remove from likes' : 'Hide from view'}">&minus;</button>
     <button class="rate-btn plus${isLiked ? ' liked' : ''}" onclick="rateIcon('${c.icon}','plus')" title="${isLiked ? 'Unlike' : 'Like'}">&plus;</button>`;
 
-  const dlBtn = `<span class="set-download" style="position:absolute;top:12px;right:16px;font-size:12px" onclick="showExportMenu(event,'icon','${c.icon}')" onmouseenter="prefetchIcon('${c.icon}')">Download</span>`;
+  const dlBtn = `<span class="set-download" style="font-size:12px;margin-left:8px" onclick="showExportMenu(event,'icon','${c.icon}')" onmouseenter="prefetchIcon('${c.icon}')">Download</span>`;
 
   if (currentView === 'versions') {
     // Full versions view — all variants displayed larger
-    canvas.innerHTML = `<div class="single-view" style="position:relative">
-      ${dlBtn}
+    canvas.innerHTML = `<div class="single-view">
       <div class="single-set-name">${c.set}</div>
-      <div class="single-icon-name" style="font-size:13px;font-weight:600;margin-bottom:8px">${baseName}</div>
+      <div class="single-icon-name" style="font-size:13px;font-weight:600;margin-bottom:8px">${baseName} ${dlBtn}</div>
       <div class="versions-grid" style="max-width:${Math.max(700, (currentScale + 40) * 5)}px">${variants.map((v, i) => {
         const vName = v.icon.split(':')[1];
         const suffix = vName.replace(baseName, '').replace(/^-/, '') || 'default';
@@ -2473,13 +2472,12 @@ function renderSingleView(canvas, active) {
     </div>`;
   }).join('')}</div>` : '';
 
-  canvas.innerHTML = `<div class="single-view" style="position:relative">
-    ${dlBtn}
+  canvas.innerHTML = `<div class="single-view">
     <div class="single-set-name">${c.set}</div>
     <div class="single-icon-display">
       <iconify-icon icon="${c.icon}" width="${sz}" height="${sz}"></iconify-icon>
     </div>
-    <div class="single-icon-name">${c.icon}</div>
+    <div class="single-icon-name">${c.icon} ${dlBtn}</div>
     ${variantHtml}
     ${singleNavHtml('navSingle(-1)','navSingle(1)',rateHtml,singleIndex,uniqueIcons.length)}
   </div>`;
