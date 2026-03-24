@@ -187,8 +187,9 @@ async function renderImageCell(td, svg, format) {
 function renderSVGCell(td, svg) {
   try {
     if (!svg || svg.length === 0) { markCell(td, false, '<em>empty</em>'); return; }
-    // Render inline - wrap in a sized container
-    const safe = svg.replace(/<script[\s\S]*?<\/script>/gi, '');
+    // Force SVG to render at 48x48
+    const sized = svg.replace(/<svg/, '<svg width="48" height="48"').replace(/width="[^"]*"/, 'width="48"').replace(/height="[^"]*"/, 'height="48"');
+    const safe = sized.replace(/<script[\s\S]*?<\/script>/gi, '');
     markCell(td, true, `<div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;margin:0 auto">${safe}</div>`);
   } catch (e) {
     markCell(td, false, `<em>${escHtml(e.message)}</em>`);
@@ -199,12 +200,12 @@ function renderCSSCell(td, svg, iconName) {
   try {
     const css = svgToCSS(svg, iconName);
     if (!css || css.length === 0) { markCell(td, false, '<em>empty</em>'); return; }
-    // Inject a style and show preview div
+    // Inject style, show ONLY the visual preview (no code)
     const styleId = 'css-' + iconName + '-' + Math.random().toString(36).slice(2, 8);
     const styleEl = document.createElement('style');
-    styleEl.textContent = css.replace(`.icon-${iconName}`, `.${styleId}`);
+    styleEl.textContent = css.replace(`.icon-${iconName}`, `.${styleId}`).replace(/width:\s*24px/, 'width:48px').replace(/height:\s*24px/, 'height:48px');
     document.head.appendChild(styleEl);
-    markCell(td, true, `<div class="css-preview ${styleId}"></div><pre>${escHtml(truncate(css, 4))}</pre>`);
+    markCell(td, true, `<div class="${styleId}" style="margin:0 auto"></div>`);
   } catch (e) {
     markCell(td, false, `<em>${escHtml(e.message)}</em>`);
   }
@@ -214,7 +215,7 @@ function renderBase64Cell(td, svg) {
   try {
     const uri = svgToBase64(svg);
     if (!uri || uri.length < 30) { markCell(td, false, '<em>empty</em>'); return; }
-    markCell(td, true, `<img src="${uri}" alt="base64" style="max-width:48px;max-height:48px">`);
+    markCell(td, true, `<img src="${uri}" alt="base64" width="48" height="48">`);
   } catch (e) {
     markCell(td, false, `<em>${escHtml(e.message)}</em>`);
   }
@@ -233,11 +234,12 @@ function renderCodeCell(td, code, label) {
         .replace(/<script[\s\S]*?<\/script>/gi, '');
       visual = `<div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;margin:0 auto">${safe}</div>`;
     } else if (label === 'Swift') {
-      // Swift uses base64 encoded SVG - decode and render
+      // Swift uses base64 encoded SVG - decode and render at 48px
       const b64Match = code.match(/base64Encoded:\s*"([^"]+)"/);
       if (b64Match) {
         try {
-          const decoded = atob(b64Match[1]);
+          let decoded = atob(b64Match[1]);
+          decoded = decoded.replace(/<svg/, '<svg width="48" height="48"').replace(/width="[^"]*"/, 'width="48"').replace(/height="[^"]*"/, 'height="48"');
           const safeSvg = decoded.replace(/<script[\s\S]*?<\/script>/gi, '');
           visual = `<div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;margin:0 auto">${safeSvg}</div>`;
         } catch(e) { visual = ''; }
