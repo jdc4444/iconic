@@ -3181,10 +3181,10 @@ async function exportSetZip(setId, format = 'svg') {
 // ── Format converters for zip export ──
 function svgToVue(svg, name) {
   const comp = name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
-  return `<template>\n  ${svg.replace(/width="[^"]*"/, ':width="size"').replace(/height="[^"]*"/, ':height="size"')}\n</template>\n\n<script>\nexport default {\n  name: '${comp}Icon',\n  props: { size: { type: Number, default: 24 } }\n}\n<\/script>\n`;
+  return `<template>\n  ${svg.replace(/width="[^"]*"/, ':width="size"').replace(/height="[^"]*"/, ':height="size"')}\n</template>\n\n<` + `script>\nexport default {\n  name: '${comp}Icon',\n  props: { size: { type: Number, default: 24 } }\n}\n</` + `script>\n`;
 }
 function svgToSvelte(svg, name) {
-  return `<script>\n  export let size = 24;\n<\/script>\n\n${svg.replace(/width="[^"]*"/, 'width={size}').replace(/height="[^"]*"/, 'height={size}')}\n`;
+  return `<` + `script>\n  export let size = 24;\n</` + `script>\n\n${svg.replace(/width="[^"]*"/, 'width={size}').replace(/height="[^"]*"/, 'height={size}')}\n`;
 }
 function svgToSwift(svg, name) {
   const comp = name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
@@ -3240,7 +3240,7 @@ async function exportPDF(iconId) {
 function exportVue(iconId) {
   getSVG(iconId).then(svg => {
     const name = iconId.split(':')[1].replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
-    const comp = `<template>\n  ${svg.replace(/width="[^"]*"/, ':width="size"').replace(/height="[^"]*"/, ':height="size"')}\n</template>\n\n<script>\nexport default {\n  name: '${name}Icon',\n  props: { size: { type: Number, default: 24 } }\n}\n<\/script>\n`;
+    const comp = svgToVue(svg, name);
     triggerTextDownload(comp, name + 'Icon.vue', 'text/plain');
   });
 }
@@ -3248,7 +3248,7 @@ function exportVue(iconId) {
 function exportSvelte(iconId) {
   getSVG(iconId).then(svg => {
     const name = iconId.split(':')[1].replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\s/g, '');
-    const comp = `<script>\n  export let size = 24;\n<\/script>\n\n${svg.replace(/width="[^"]*"/, 'width={size}').replace(/height="[^"]*"/, 'height={size}')}\n`;
+    const comp = svgToSvelte(svg, name);
     triggerTextDownload(comp, name + 'Icon.svelte', 'text/plain');
   });
 }
